@@ -1,0 +1,480 @@
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --black: #1a1a1a;
+    --eggshell: #f5f5dc;
+    --white: #ffffff;
+    --dark-gray: #2d2d2d;
+    --light-gray: #666666;
+    --border: #d3d3d3;
+    --shadow: 0 2px 8px rgba(0,0,0,0.15);
+    --shadow-hover: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--black);
+    background: var(--eggshell);
+    line-height: 1.6;
+}
+
+/* Navigation */
+.top-nav {
+    background: var(--black);
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.nav-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--eggshell);
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.nav-links a {
+    color: var(--eggshell);
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: background 0.3s;
+}
+
+.nav-links a:hover {
+    background: var(--dark-gray);
+}
+
+.nav-links a.active {
+    background: var(--dark-gray);
+    color: var(--eggshell);
+}
+
+.nav-links span {
+    color: var(--eggshell);
+    opacity: 0.8;
+}
+
+/* Landing Page */
+.landing-main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 4rem 1rem;
+}
+
+.hero {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.hero h1 {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    color: var(--black);
+    font-weight: 300;
+}
+
+.hero p {
+    font-size: 1.25rem;
+    color: var(--light-gray);
+}
+
+/* Navigation Cards */
+.navigation-cards {
+    margin-bottom: 4rem;
+}
+
+.nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2rem;
+}
+
+.nav-card {
+    background: var(--white);
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    text-decoration: none;
+    color: var(--black);
+    transition: all 0.3s ease;
+    text-align: center;
+    border: 1px solid var(--border);
+}
+
+.nav-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+    border-color: var(--black);
+}
+
+.card-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.nav-card h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--black);
+    font-weight: 600;
+}
+
+.nav-card p {
+    color: var(--light-gray);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Content Pages */
+.content-main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.page-hero {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding: 2rem 0;
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.page-hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--black);
+}
+
+.page-hero p {
+    color: var(--light-gray);
+    font-size: 1.125rem;
+}
+
+/* Content Sections */
+.content-section {
+    background: var(--white);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
+}
+
+.content-section h2 {
+    margin-bottom: 1.5rem;
+    color: var(--black);
+    border-bottom: 2px solid var(--eggshell);
+    padding-bottom: 0.5rem;
+}
+
+/* Buttons */
+button, .btn {
+    background: var(--black);
+    color: var(--eggshell);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+    font-weight: 500;
+}
+
+button:hover, .btn:hover {
+    background: var(--dark-gray);
+    transform: translateY(-1px);
+}
+
+button.secondary, .btn.secondary {
+    background: var(--white);
+    color: var(--black);
+    border: 2px solid var(--black);
+}
+
+button.secondary:hover, .btn.secondary:hover {
+    background: var(--eggshell);
+}
+
+/* Forms */
+input, textarea, select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    background: var(--white);
+    color: var(--black);
+    transition: border-color 0.3s;
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--black);
+}
+
+/* Modals */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    overflow: auto;
+}
+
+.modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: var(--white);
+    padding: 2rem;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: var(--shadow-hover);
+}
+
+.modal-content.wide {
+    max-width: 800px;
+}
+
+.modal-content h3 {
+    margin-bottom: 1.5rem;
+    color: var(--black);
+}
+
+/* Lists and Items */
+.item-list {
+    list-style: none;
+}
+
+.item {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow);
+}
+
+.item h3 {
+    color: var(--black);
+    margin-bottom: 0.5rem;
+}
+
+.item-meta {
+    color: var(--light-gray);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.item-content {
+    color: var(--black);
+}
+
+/* Messages */
+.message {
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    border-left: 4px solid;
+}
+
+.message.success {
+    background: #f0fdf4;
+    color: #166534;
+    border-color: #22c55e;
+}
+
+.message.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #ef4444;
+}
+
+/* Footer */
+footer {
+    background: var(--black);
+    color: var(--eggshell);
+    text-align: center;
+    padding: 2rem;
+    margin-top: 4rem;
+}
+
+footer a {
+    color: var(--eggshell);
+}
+
+/* Login Page */
+.login-container {
+    max-width: 400px;
+    margin: 4rem auto;
+    padding: 2.5rem;
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: var(--shadow-hover);
+}
+
+.login-container h2 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: var(--black);
+}
+
+.demo-accounts {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: var(--eggshell);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    color: var(--light-gray);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .nav-links {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .hero h1 {
+        font-size: 2rem;
+    }
+    
+    .nav-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .nav-card {
+        padding: 2rem;
+    }
+    
+    .modal-content {
+        width: 95%;
+        padding: 1.5rem;
+    }
+}
+
+/* Loading States */
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--light-gray);
+}
+
+/* Calendar specific styles */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.calendar-day {
+    background: var(--white);
+    padding: 0.75rem;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.calendar-day:hover {
+    background: var(--eggshell);
+}
+
+.calendar-day.has-event {
+    background: var(--black);
+    color: var(--eggshell);
+    font-weight: bold;
+}
+
+.calendar-day.today {
+    background: var(--dark-gray);
+    color: var(--eggshell);
+}
+
+.calendar-day.other-month {
+    color: var(--light-gray);
+    opacity: 0.5;
+}
+
+/* Recipe layout */
+.recipe-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin: 1rem 0;
+}
+
+.recipe-current, .recipe-history {
+    background: var(--eggshell);
+    padding: 1.5rem;
+    border-radius: 8px;
+}
+
+.recipe-history {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.recipe-change {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.recipe-change .author {
+    font-weight: bold;
+    color: var(--black);
+}
+
+.recipe-change .date {
+    font-size: 0.875rem;
+    color: var(--light-gray);
+}
+
+@media (max-width: 768px) {
+    .recipe-layout {
+        grid-template-columns: 1fr;
+    }
+}

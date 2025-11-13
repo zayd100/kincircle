@@ -1,0 +1,39 @@
+# Sensitive configuration
+config.php
+private/
+
+# User uploads
+uploads/*
+upload/*
+
+# Keep directory structure but ignore contents
+!uploads/.gitkeep
+!upload/.gitkeep
+
+# Node modules
+node_modules/
+
+# Logs and debug files
+*.log
+debug_*.php
+test_*.php
+capture_api_response.php
+emergency_check_liam.php
+rescue_clarke.php
+nuclear_reset_users.php
+diagnose_user_and_writes.php
+full_site_diagnostic.php
+
+# Database dumps
+*.sql.gz
+*.sql.backup
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo

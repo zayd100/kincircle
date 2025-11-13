@@ -1,0 +1,17 @@
+RewriteEngine On
+
+# Route /api/photo-tags/{id} to photo-tags.php
+RewriteRule ^photo-tags/([0-9]+)$ photo-tags.php [L,QSA]
+
+# Route /api/media/{id} to media-item.php
+RewriteRule ^media/([0-9]+)$ media-item.php [L,QSA]
+
+# Add .php extension if file exists
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.*)$ $1.php [L]
+
+# Handle subdirectory requests
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^/]+)/(.*)$ $1/$2.php [L]

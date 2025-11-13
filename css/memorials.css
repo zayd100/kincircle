@@ -1,0 +1,345 @@
+/* Memorial Page - Black and Eggshell Theme */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a1a;
+    color: #f5f5dc;
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* Header with Back Button (10% area) */
+.memorial-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10vh;
+    background: rgba(26, 26, 26, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(245, 245, 220, 0.1);
+    display: flex;
+    align-items: center;
+    padding: 0 2rem;
+    z-index: 100;
+}
+
+.back-to-site {
+    color: #f5f5dc;
+    text-decoration: none;
+    font-size: 1.1rem;
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid rgba(245, 245, 220, 0.2);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    background: rgba(245, 245, 220, 0.05);
+}
+
+.back-to-site:hover {
+    background: rgba(245, 245, 220, 0.1);
+    border-color: rgba(245, 245, 220, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Main Memorial Content (90% area) */
+.memorial-container {
+    margin-top: 10vh;
+    min-height: 90vh;
+    padding: 3rem 2rem;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.memorial-page-header {
+    text-align: center;
+    margin-bottom: 4rem;
+    position: relative;
+}
+
+.memorial-title {
+    font-size: 3rem;
+    font-weight: 300;
+    margin-bottom: 1rem;
+    color: #f5f5dc;
+    letter-spacing: -0.02em;
+}
+
+.memorial-subtitle {
+    font-size: 1.2rem;
+    color: rgba(245, 245, 220, 0.7);
+    font-weight: 300;
+    font-style: italic;
+    margin-bottom: 2rem;
+}
+
+.create-memorial-btn {
+    display: inline-block;
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.8), rgba(99, 102, 241, 0.8));
+    color: #f5f5dc;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+}
+
+.create-memorial-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(139, 92, 246, 0.4);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(99, 102, 241, 0.9));
+}
+
+.no-memorials {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: rgba(245, 245, 220, 0.6);
+}
+
+.no-memorials p {
+    font-size: 1.2rem;
+    margin: 1rem 0;
+}
+
+.no-memorials p:first-child {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: rgba(245, 245, 220, 0.8);
+}
+
+/* Memorial Cards */
+.memorial-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.memorial-card {
+    background: rgba(245, 245, 220, 0.05);
+    border: 1px solid rgba(245, 245, 220, 0.1);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.4s ease;
+    backdrop-filter: blur(5px);
+}
+
+.memorial-card:hover {
+    transform: translateY(-4px);
+    background: rgba(245, 245, 220, 0.08);
+    border-color: rgba(245, 245, 220, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.memorial-photo {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 1.5rem;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid rgba(245, 245, 220, 0.2);
+    transition: all 0.3s ease;
+}
+
+.memorial-card:hover .memorial-photo {
+    border-color: rgba(245, 245, 220, 0.4);
+}
+
+.memorial-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.memorial-name {
+    font-size: 1.5rem;
+    font-weight: 400;
+    margin-bottom: 0.5rem;
+    color: #f5f5dc;
+}
+
+.memorial-dates {
+    color: rgba(245, 245, 220, 0.6);
+    font-size: 1rem;
+    font-style: italic;
+}
+
+/* Memorial Slideout (90% width from right) */
+.memorial-slideout {
+    position: fixed;
+    top: 0;
+    right: -90%;
+    width: 90%;
+    height: 100vh;
+    background: #1a1a1a;
+    border-left: 1px solid rgba(245, 245, 220, 0.2);
+    transition: right 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+    z-index: 200;
+    overflow-y: auto;
+}
+
+.memorial-slideout.open {
+    right: 0;
+}
+
+.slideout-header {
+    padding: 2rem;
+    border-bottom: 1px solid rgba(245, 245, 220, 0.1);
+    background: rgba(26, 26, 26, 0.95);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.close-slideout {
+    background: none;
+    border: 1px solid rgba(245, 245, 220, 0.2);
+    color: #f5f5dc;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.close-slideout:hover {
+    background: rgba(245, 245, 220, 0.1);
+    border-color: rgba(245, 245, 220, 0.3);
+}
+
+.slideout-content {
+    padding: 3rem;
+}
+
+/* Memorial Detail Content */
+.memorial-detail {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.detail-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.detail-photo {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 2rem;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 4px solid rgba(245, 245, 220, 0.2);
+}
+
+.detail-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.detail-name {
+    font-size: 2.5rem;
+    font-weight: 300;
+    margin-bottom: 0.5rem;
+    color: #f5f5dc;
+}
+
+.detail-dates {
+    font-size: 1.2rem;
+    color: rgba(245, 245, 220, 0.6);
+    font-style: italic;
+    margin-bottom: 2rem;
+}
+
+.detail-section {
+    margin-bottom: 3rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 400;
+    margin-bottom: 1.5rem;
+    color: #f5f5dc;
+    border-bottom: 1px solid rgba(245, 245, 220, 0.2);
+    padding-bottom: 0.5rem;
+}
+
+.section-content {
+    color: rgba(245, 245, 220, 0.8);
+    font-size: 1.1rem;
+    line-height: 1.8;
+}
+
+.photo-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.gallery-photo {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(245, 245, 220, 0.1);
+}
+
+.gallery-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.gallery-photo:hover img {
+    transform: scale(1.05);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .memorial-container {
+        padding: 2rem 1rem;
+    }
+    
+    .memorial-title {
+        font-size: 2rem;
+    }
+    
+    .memorial-list {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .memorial-slideout {
+        width: 95%;
+        right: -95%;
+    }
+    
+    .slideout-content {
+        padding: 2rem 1rem;
+    }
+    
+    .detail-name {
+        font-size: 2rem;
+    }
+}
+
+/* Smooth Transitions */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition: none !important;
+        animation: none !important;
+    }
+}
