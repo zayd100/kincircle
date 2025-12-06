@@ -1,7 +1,9 @@
 // Media Admin Module
+console.log('🎬 MEDIA ADMIN MODULE LOADING - VERSION 2025-11-02-v2');
 
 class MediaAdmin {
     constructor() {
+        console.log('🎬 MediaAdmin constructor called');
         this.pendingSubmissions = [];
         this.mediaCategories = [];
         this.mediaLibrary = [];
@@ -18,12 +20,18 @@ class MediaAdmin {
     async loadDashboardData() {
         try {
             // Load pending media submissions
+            console.log('Media Admin: Loading pending media from /api/pending-media.php');
             const pendingResponse = await fetch('/api/pending-media.php');
+            console.log('Media Admin: Response status:', pendingResponse.status);
+
             if (pendingResponse.ok) {
                 const data = await pendingResponse.json();
+                console.log('Media Admin: Received data:', data);
+
                 // Ensure we have an array
                 this.pendingSubmissions = Array.isArray(data) ? data :
                                          (data.submissions ? data.submissions : []);
+                console.log('Media Admin: Pending submissions loaded:', this.pendingSubmissions.length, 'items');
             } else {
                 console.log('Pending media API not available, using empty array');
                 this.pendingSubmissions = [];
@@ -227,8 +235,8 @@ class MediaAdmin {
                         <button class="btn btn-sm btn-secondary" onclick="editMedia('${item.id}')">
                             ✏️ Edit
                         </button>
-                        <button class="btn btn-sm btn-danger" onclick="archiveMedia('${item.id}')">
-                            📦 Archive
+                        <button class="btn btn-sm btn-danger" onclick="deleteMedia('${item.id}')">
+                            🗑️ Delete
                         </button>
                     </div>
                 </div>
@@ -307,11 +315,15 @@ class MediaAdmin {
     }
 
     async render(container) {
+        console.log('Media Admin render() called, dataLoaded:', this.dataLoaded);
         // Load data if not already loaded
         if (!this.dataLoaded) {
             console.log('Media Admin: Loading dashboard data...');
             await this.loadDashboardData();
             this.dataLoaded = true;
+            console.log('Media Admin: Data loaded. Pending:', this.pendingSubmissions.length, 'Library:', this.mediaLibrary.length);
+        } else {
+            console.log('Media Admin: Data already loaded, skipping load');
         }
         
         container.innerHTML = `
@@ -701,9 +713,51 @@ class MediaAdmin {
 }
 
 // Global functions for onclick handlers
-function quickRejectMedia(mediaId) {
-    if (!confirm('Are you sure you want to reject this media?')) return;
-    mediaAdmin.showMessage('Media rejected', 'success');
+async function quickRejectMedia(mediaId) {
+    const reason = prompt('Reason for rejection (optional):');
+    if (reason === null) return; // User cancelled
+
+    const submission = mediaAdmin.pendingSubmissions.find(s => s.id == mediaId);
+    if (!submission) {
+        mediaAdmin.showMessage('Submission not found', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/reject-media.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: mediaId,
+                reviewerNotes: reason || 'No reason provided'
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Remove from pending list
+            mediaAdmin.pendingSubmissions = mediaAdmin.pendingSubmissions.filter(s => s.id != mediaId);
+
+            // Re-render pending tab
+            const pendingContainer = document.getElementById('pendingMedia');
+            if (pendingContainer) {
+                pendingContainer.innerHTML = mediaAdmin.renderPendingMedia();
+            }
+
+            mediaAdmin.showMessage(`Rejected: ${submission.original_name}`, 'success');
+
+            // Refresh stats
+            if (window.adminCore) {
+                adminCore.refreshStats();
+            }
+        } else {
+            mediaAdmin.showMessage(result.error || 'Rejection failed', 'error');
+        }
+    } catch (error) {
+        console.error('Rejection error:', error);
+        mediaAdmin.showMessage('Network error during rejection', 'error');
+    }
 }
 
 function reviewMedia(mediaId) {
@@ -721,11 +775,52 @@ function reviewMedia(mediaId) {
     document.getElementById('mediaReviewModal').classList.add('active');
 }
 
-function quickApproveMedia(mediaId) {
+async function quickApproveMedia(mediaId) {
     const submission = mediaAdmin.pendingSubmissions.find(s => s.id == mediaId);
-    if (!submission) return;
-    
-    mediaAdmin.showMessage(`Approved: ${submission.title || submission.original_name}`, 'success');
+    if (!submission) {
+        mediaAdmin.showMessage('Submission not found', 'error');
+        return;
+    }
+
+    // Use suggested_album as the category
+    const category = submission.suggested_album || 'general-media';
+
+    try {
+        const response = await fetch('/api/approve-media.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: mediaId,
+                category: category,
+                reviewerNotes: 'Quick approved'
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Remove from pending list
+            mediaAdmin.pendingSubmissions = mediaAdmin.pendingSubmissions.filter(s => s.id != mediaId);
+
+            // Re-render pending tab
+            const pendingContainer = document.getElementById('pendingMedia');
+            if (pendingContainer) {
+                pendingContainer.innerHTML = mediaAdmin.renderPendingMedia();
+            }
+
+            mediaAdmin.showMessage(`Approved: ${submission.original_name}`, 'success');
+
+            // Refresh stats
+            if (window.adminCore) {
+                adminCore.refreshStats();
+            }
+        } else {
+            mediaAdmin.showMessage(result.error || 'Approval failed', 'error');
+        }
+    } catch (error) {
+        console.error('Approval error:', error);
+        mediaAdmin.showMessage('Network error during approval', 'error');
+    }
 }
 
 function openDocument(filepath) {
@@ -742,12 +837,51 @@ function deleteCategory(categoryId) {
 }
 
 function editMedia(mediaId) {
-    mediaAdmin.showMessage(`Edit media: ${mediaId}`, 'info');
+    mediaAdmin.showMessage('Edit feature not yet implemented', 'info');
 }
 
-function archiveMedia(mediaId) {
-    if (!confirm('Archive this media item?')) return;
-    mediaAdmin.showMessage('Media archiving not implemented', 'info');
+async function deleteMedia(mediaId) {
+    const media = mediaAdmin.mediaLibrary.find(m => m.id == mediaId);
+    if (!media) {
+        mediaAdmin.showMessage('Media not found', 'error');
+        return;
+    }
+
+    const confirmMsg = `Are you sure you want to permanently delete "${media.title || 'this media'}"?\n\nThis action cannot be undone.`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const response = await fetch('/api/delete-media.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: mediaId })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Remove from library
+            mediaAdmin.mediaLibrary = mediaAdmin.mediaLibrary.filter(m => m.id != mediaId);
+
+            // Re-render library tab
+            const libraryContainer = document.getElementById('mediaLibraryGrid');
+            if (libraryContainer) {
+                libraryContainer.innerHTML = mediaAdmin.renderLibraryGrid();
+            }
+
+            mediaAdmin.showMessage('Media deleted successfully', 'success');
+
+            // Refresh stats
+            if (window.adminCore) {
+                adminCore.refreshStats();
+            }
+        } else {
+            mediaAdmin.showMessage(result.error || 'Delete failed', 'error');
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+        mediaAdmin.showMessage('Network error during deletion', 'error');
+    }
 }
 
 // Register module with admin core

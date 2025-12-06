@@ -41,16 +41,7 @@ try {
     ");
     $peopleStmt->execute();
     $peopleTags = $peopleStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Calculate statistics
-    $albumCount = count($albumStats);
-    $photoCount = count($photos);
-    
-    // Calculate year span
-    $earliestYear = $photos ? date('Y', strtotime(min(array_column($photos, 'date_taken')))) : date('Y');
-    $latestYear = $photos ? date('Y', strtotime(max(array_column($photos, 'date_taken')))) : date('Y');
-    $yearSpan = ($latestYear - $earliestYear) . '+';
-    
+
     if ($isAdmin) {
         // Get pending photo count for admin bar
         $pendingStmt = $pdo->prepare("
@@ -67,9 +58,6 @@ try {
     $photos = [];
     $albumStats = [];
     $peopleTags = [];
-    $albumCount = 0;
-    $photoCount = 0;
-    $yearSpan = '0';
     $pendingCount = 0;
 }
 ?>
@@ -155,22 +143,6 @@ try {
         
         <div class="photo-grid" id="photoGrid">
             <!-- Photos will be loaded here -->
-        </div>
-        
-        <!-- Gallery Stats Footer -->
-        <div class="gallery-stats">
-            <div class="stat-card">
-                <div class="stat-number" id="albumCount"><?= $albumCount ?></div>
-                <div class="stat-label">Albums</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="photoCount"><?= $photoCount ?></div>
-                <div class="stat-label">Photos</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="yearSpan"><?= $yearSpan ?></div>
-                <div class="stat-label">Years</div>
-            </div>
         </div>
         </div>
     </main>

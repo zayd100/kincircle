@@ -17,37 +17,41 @@ $activeContributors = 0;
 
 // Fetch board data from database
 try {
-    // Get all threads with reply counts
+    // Get all threads with reply counts (using messages table)
     $stmt = $pdo->prepare("
-        SELECT t.*, u.display_name as author_name,
+        SELECT m.id, m.subject as title, m.content, m.created_at,
+               m.posted_by as user_id, u.display_name as author_name,
                COUNT(DISTINCT r.id) as reply_count,
-               MAX(r.created_at) as last_reply_time
-        FROM board_threads t
-        LEFT JOIN users u ON t.user_id = u.id
-        LEFT JOIN board_replies r ON t.id = r.thread_id
-        GROUP BY t.id
-        ORDER BY COALESCE(MAX(r.created_at), t.created_at) DESC
+               MAX(r.created_at) as last_reply_time,
+               0 as view_count, 0 as is_pinned, 0 as is_locked,
+               'general' as category
+        FROM messages m
+        LEFT JOIN users u ON m.posted_by = u.id
+        LEFT JOIN message_replies r ON m.id = r.message_id
+        WHERE m.is_active = 1
+        GROUP BY m.id
+        ORDER BY COALESCE(MAX(r.created_at), m.created_at) DESC
     ");
     $stmt->execute();
     $threads = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     // Get statistics
     $totalThreads = count($threads);
-    
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM board_replies");
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM message_replies");
     $stmt->execute();
     $totalReplies = $stmt->fetchColumn();
-    
-    $stmt = $pdo->prepare("SELECT SUM(view_count) FROM board_threads");
-    $stmt->execute();
-    $totalViews = $stmt->fetchColumn() ?: 0;
-    
+
+    // View count not tracked yet - set to 0
+    $totalViews = 0;
+
     // Get recent activity
     $stmt = $pdo->prepare("
-        SELECT 'thread' as type, t.id, t.title, t.created_at, u.display_name
-        FROM board_threads t
-        JOIN users u ON t.user_id = u.id
-        ORDER BY t.created_at DESC
+        SELECT 'thread' as type, m.id, m.subject as title, m.created_at, u.display_name
+        FROM messages m
+        JOIN users u ON m.posted_by = u.id
+        WHERE m.is_active = 1
+        ORDER BY m.created_at DESC
         LIMIT 5
     ");
     $stmt->execute();

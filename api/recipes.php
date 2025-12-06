@@ -80,9 +80,48 @@ try {
             }
             break;
             
+        case 'DELETE':
+            // Delete a recipe (soft delete by setting is_active = 0)
+            if (!isAdmin()) {
+                throw new Exception('Access denied');
+            }
+
+            $recipeId = (int)($_GET['id'] ?? 0);
+            if (!$recipeId) {
+                throw new Exception('Recipe ID is required');
+            }
+
+            $stmt = $pdo->prepare("UPDATE recipes SET is_active = 0 WHERE id = ?");
+            $stmt->execute([$recipeId]);
+
+            if ($stmt->rowCount() > 0) {
+                echo json_encode(['success' => true, 'message' => 'Recipe deleted successfully']);
+            } else {
+                throw new Exception('Recipe not found');
+            }
+            break;
+
         case 'POST':
             $input = json_decode(file_get_contents('php://input'), true);
-            
+
+            // Handle delete action via POST (for bulk operations)
+            if ($action === 'delete') {
+                if (!isAdmin()) {
+                    throw new Exception('Access denied');
+                }
+
+                $recipeId = (int)($input['recipe_id'] ?? 0);
+                if (!$recipeId) {
+                    throw new Exception('Recipe ID is required');
+                }
+
+                $stmt = $pdo->prepare("UPDATE recipes SET is_active = 0 WHERE id = ?");
+                $stmt->execute([$recipeId]);
+
+                echo json_encode(['success' => true, 'message' => 'Recipe deleted successfully']);
+                break;
+            }
+
             if ($action === 'add') {
                 // Add new recipe with all fields
                 $name = sanitizeInput($input['name'] ?? '');

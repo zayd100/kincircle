@@ -1,5 +1,7 @@
 <?php
 require_once '../config.php';
+require_once '../lib/R2.php';
+
 requireLogin();
 
 header('Content-Type: application/json');
@@ -20,76 +22,69 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 try {
     $data = json_decode(file_get_contents('php://input'), true);
 
+    $submissionId = $data['id'] ?? '';
     $filename = $data['filename'] ?? '';
     $album = $data['album'] ?? '';
     $reviewerNotes = $data['reviewerNotes'] ?? '';
     $reviewerId = $_SESSION['user_id'];
 
-    if (!$filename || !$album) {
-        throw new Exception('Filename and album are required');
+    if (!$submissionId && !$filename) {
+        throw new Exception('Submission ID or filename required');
     }
 
-    // Get submission details
-    $stmt = $pdo->prepare("SELECT * FROM photo_submissions WHERE filename = ? AND status = 'pending'");
-    $stmt->execute([$filename]);
+    if (!$album) {
+        throw new Exception('Album is required');
+    }
+
+    if (strpos($album, '..') !== false || strpos($album, '/') !== false || strpos($album, '\\') !== false) {
+        throw new Exception('Invalid album name');
+    }
+
+    // Sanitize album name for use as path component
+    $safeAlbum = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $album);
+
+    // Get submission details - prefer ID if available
+    if ($submissionId) {
+        $stmt = $pdo->prepare("SELECT * FROM photo_submissions WHERE id = ? AND status = 'pending'");
+        $stmt->execute([$submissionId]);
+    } else {
+        $stmt = $pdo->prepare("SELECT * FROM photo_submissions WHERE filename = ? AND status = 'pending'");
+        $stmt->execute([$filename]);
+    }
     $submission = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$submission) {
         throw new Exception('Submission not found or already processed');
     }
 
-    // Move file from pending to album directory
-    $pendingPath = '../uploads/pending/' . $filename;
-    $albumPath = '../uploads/albums/' . $album;
-    $approvedPath = $albumPath . '/' . $filename;
+    // R2 Storage: Copy from pending to approved path
+    $r2 = new R2();
+    $storageKey = $submission['storage_key'];
+    $approvedKey = 'approved/albums/' . $safeAlbum . '/' . $filename;
 
-    error_log("Attempting to approve photo:");
-    error_log("  Pending path: $pendingPath");
-    error_log("  Album path: $albumPath");
-    error_log("  Approved path: $approvedPath");
-
-    if (!file_exists($pendingPath)) {
-        error_log("ERROR: Photo file not found at: $pendingPath");
-        throw new Exception('Photo file not found in pending directory');
+    if (!$r2->objectExists($storageKey)) {
+        throw new Exception('Photo file not found in R2 storage');
     }
 
-    // Ensure album directory exists
-    if (!is_dir($albumPath)) {
-        error_log("Creating album directory: $albumPath");
-        if (!mkdir($albumPath, 0777, true)) {
-            error_log("ERROR: Failed to create album directory");
-            throw new Exception('Failed to create album directory');
-        }
-        chmod($albumPath, 0777);
+    if (!$r2->copyObject($storageKey, $approvedKey)) {
+        throw new Exception('Failed to copy photo to approved location in R2');
     }
 
-    // Move the file
-    error_log("Moving file from $pendingPath to $approvedPath");
-    if (!rename($pendingPath, $approvedPath)) {
-        $error = error_get_last();
-        error_log("ERROR: Failed to move photo file: " . print_r($error, true));
-        throw new Exception('Failed to move photo file - check permissions');
-    }
+    $r2->deleteObject($storageKey);
 
-    // Set file permissions
-    chmod($approvedPath, 0666);
-    error_log("Successfully moved and set permissions on photo");
-
-    // Update submission status
+    // Update submission status and storage key using submission ID
     $updateStmt = $pdo->prepare("
         UPDATE photo_submissions
         SET status = 'approved',
+            storage_key = ?,
             final_album = ?,
             reviewer_notes = ?,
             reviewed_by = ?,
             reviewed_at = NOW()
-        WHERE filename = ?
+        WHERE id = ?
     ");
 
-    $updateStmt->execute([$album, $reviewerNotes, $reviewerId, $filename]);
-
-    // TODO: Add photo to the actual album/gallery system
-    // This would involve creating entries in a photos table or similar
+    $updateStmt->execute([$approvedKey, $album, $reviewerNotes, $reviewerId, $submission['id']]);
 
     echo json_encode([
         'success' => true,

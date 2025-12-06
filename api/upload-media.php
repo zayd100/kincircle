@@ -69,9 +69,9 @@ try {
             continue;
         }
 
-        // Validate file size (50MB max for media)
-        if ($fileSize > 50 * 1024 * 1024) {
-            $errors[] = "{$filename} is too large (max 50MB)";
+        // Validate file size (500MB max for media)
+        if ($fileSize > 500 * 1024 * 1024) {
+            $errors[] = "{$filename} is too large (max 500MB)";
             continue;
         }
 

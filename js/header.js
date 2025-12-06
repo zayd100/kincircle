@@ -208,48 +208,36 @@ class UnifiedHeader {
                 <!-- Actions -->
                 <div class="header-actions">
                     ${this.renderUserSection()}
-                    
-                    <!-- Mobile Menu Toggle -->
-                    <button class="mobile-menu-toggle" id="mobileMenuToggle">
-                        <span>☰</span>
-                    </button>
-                </div>
-
-                <!-- Mobile Menu -->
-                <div class="mobile-menu" id="mobileMenu">
-                    <nav class="mobile-nav-links">
-                        <a href="/photos.php" class="nav-link" data-page="photos">
-                            <span>📸</span> Photos
-                        </a>
-                        <a href="/media.php" class="nav-link" data-page="media">
-                            <span>🎬</span> Media
-                        </a>
-                        <a href="/calendar.php" class="nav-link" data-page="calendar">
-                            <span>📅</span> Calendar
-                        </a>
-                        <a href="/events.php" class="nav-link" data-page="events">
-                            <span>🎉</span> Events
-                        </a>
-                        <a href="/board.php" class="nav-link" data-page="board">
-                            <span>📋</span> Board
-                        </a>
-                        <a href="/directory.php" class="nav-link" data-page="directory">
-                            <span>📖</span> Directory
-                        </a>
-                        <a href="/recipes.php" class="nav-link" data-page="recipes">
-                            <span>🍝</span> Recipes
-                        </a>
-                        <a href="/memorials.php" class="nav-link" data-page="memorials">
-                            <span>🕊️</span> Memorials
-                        </a>
-                    </nav>
-                    
-                    <div class="mobile-actions">
-                        ${this.renderMobileUserSection()}
-                    </div>
                 </div>
             </div>
         `;
+
+        // Create mobile bottom nav
+        const mobileNav = document.createElement('nav');
+        mobileNav.className = 'mobile-bottom-nav';
+        mobileNav.innerHTML = `
+            <a href="/index.php" class="bottom-nav-item" data-page="home">
+                <span class="bottom-nav-icon">🏠</span>
+                <span class="bottom-nav-label">Home</span>
+            </a>
+            <a href="/photos.php" class="bottom-nav-item" data-page="photos">
+                <span class="bottom-nav-icon">📸</span>
+                <span class="bottom-nav-label">Photos</span>
+            </a>
+            <a href="/calendar.php" class="bottom-nav-item" data-page="calendar">
+                <span class="bottom-nav-icon">📅</span>
+                <span class="bottom-nav-label">Calendar</span>
+            </a>
+            <a href="/board.php" class="bottom-nav-item" data-page="board">
+                <span class="bottom-nav-icon">📋</span>
+                <span class="bottom-nav-label">Board</span>
+            </a>
+            <a href="/directory.php" class="bottom-nav-item" data-page="directory">
+                <span class="bottom-nav-icon">📖</span>
+                <span class="bottom-nav-label">More</span>
+            </a>
+        `;
+        document.body.appendChild(mobileNav);
 
         // Insert header at the beginning of body
         document.body.insertBefore(header, document.body.firstChild);
@@ -308,24 +296,6 @@ class UnifiedHeader {
     }
 
     setupEventListeners() {
-        // Mobile menu toggle
-        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-        const mobileMenu = document.getElementById('mobileMenu');
-        
-        if (mobileMenuToggle && mobileMenu) {
-            mobileMenuToggle.addEventListener('click', (e) => {
-                e.preventDefault();
-                mobileMenu.classList.toggle('active');
-            });
-
-            // Close mobile menu when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!mobileMenuToggle.contains(e.target) && !mobileMenu.contains(e.target)) {
-                    mobileMenu.classList.remove('active');
-                }
-            });
-        }
-
         // User avatar click (could show user menu)
         const userAvatar = document.querySelector('.user-avatar');
         if (userAvatar) {
@@ -343,6 +313,19 @@ class UnifiedHeader {
                 window.location.href = 'inbox.php';
             });
         }
+
+        // Update bottom nav active state
+        this.updateBottomNavActive();
+    }
+
+    updateBottomNavActive() {
+        const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
+        bottomNavItems.forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.page === this.currentPage) {
+                item.classList.add('active');
+            }
+        });
     }
 
     showUserMenu() {

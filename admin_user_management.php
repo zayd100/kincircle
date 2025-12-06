@@ -15,18 +15,205 @@ $messageType = '';
 if ($_POST['action'] ?? '' === 'toggle_admin') {
     $userId = (int)$_POST['user_id'];
     $makeAdmin = $_POST['make_admin'] === '1' ? 1 : 0;
-    
+
     try {
         $stmt = $pdo->prepare("UPDATE users SET is_admin = ? WHERE id = ?");
         $stmt->execute([$makeAdmin, $userId]);
-        
+
         $action = $makeAdmin ? 'granted' : 'removed';
         $message = "Admin privileges {$action} successfully!";
         $messageType = 'success';
-        
+
     } catch (Exception $e) {
         $message = "Error updating admin status: " . $e->getMessage();
         $messageType = 'error';
+    }
+}
+
+// Handle user deletion
+if ($_POST['action'] ?? '' === 'delete_user') {
+    $userId = (int)$_POST['user_id'];
+
+    // Prevent admins from deleting themselves
+    if ($userId === $_SESSION['user_id']) {
+        $message = "You cannot delete your own account! Please have another admin do this if necessary.";
+        $messageType = 'error';
+    } else {
+        try {
+            // Delete user from all related tables
+            // Column names verified against rwdata_actual.sql (Dec 2025)
+            $pdo->beginTransaction();
+
+            // === TABLES WITH CASCADE DELETE (handled automatically, but explicit is safer) ===
+
+            // photo_tags: tagged_by_user_id (has ON DELETE CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM photo_tags WHERE tagged_by_user_id = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // content_tags: tagged_by_user_id (has ON DELETE CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM content_tags WHERE tagged_by_user_id = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // people: created_by_user_id (has ON DELETE CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM people WHERE created_by_user_id = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // event_commitments: user_id (has ON DELETE CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM event_commitments WHERE user_id = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // private_messages: sender_id, recipient_id (has ON DELETE CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM private_messages WHERE sender_id = ? OR recipient_id = ?");
+                $stmt->execute([$userId, $userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // family_inferences: person_user_id, related_user_id (has ON DELETE CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM family_inferences WHERE person_user_id = ? OR related_user_id = ?");
+                $stmt->execute([$userId, $userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // family_relationships: claimer_user_id, claimed_user_id (has ON DELETE CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM family_relationships WHERE claimer_user_id = ? OR claimed_user_id = ?");
+                $stmt->execute([$userId, $userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // relationship_notifications: user_id (has ON DELETE CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM relationship_notifications WHERE user_id = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // === TABLES WITHOUT CASCADE (must handle manually) ===
+
+            // messages: posted_by (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM messages WHERE posted_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // message_replies: posted_by (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM message_replies WHERE posted_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // photo_submissions: uploader_id (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM photo_submissions WHERE uploader_id = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // memorial_submissions: submitted_by (NO CASCADE) - NOT submitter_id!
+            try {
+                $stmt = $pdo->prepare("DELETE FROM memorial_submissions WHERE submitted_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // memorials: created_by (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM memorials WHERE created_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // calendar_events: created_by (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM calendar_events WHERE created_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // event_submissions: submitter_id (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM event_submissions WHERE submitter_id = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // recipe_modifications: modified_by (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM recipe_modifications WHERE modified_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // recipes: created_by (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM recipes WHERE created_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // albums: created_by (NO CASCADE)
+            try {
+                $stmt = $pdo->prepare("DELETE FROM albums WHERE created_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // === SET NULL for reviewer/admin references ===
+
+            // admin_messages: resolved_by
+            try {
+                $stmt = $pdo->prepare("UPDATE admin_messages SET resolved_by = NULL WHERE resolved_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // pending_users: reviewed_by
+            try {
+                $stmt = $pdo->prepare("UPDATE pending_users SET reviewed_by = NULL WHERE reviewed_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // photo_submissions: reviewed_by
+            try {
+                $stmt = $pdo->prepare("UPDATE photo_submissions SET reviewed_by = NULL WHERE reviewed_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // event_submissions: reviewed_by
+            try {
+                $stmt = $pdo->prepare("UPDATE event_submissions SET reviewed_by = NULL WHERE reviewed_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // memorial_submissions: reviewed_by
+            try {
+                $stmt = $pdo->prepare("UPDATE memorial_submissions SET reviewed_by = NULL WHERE reviewed_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // family_relationships: revoked_by (has ON DELETE SET NULL, but be explicit)
+            try {
+                $stmt = $pdo->prepare("UPDATE family_relationships SET revoked_by = NULL WHERE revoked_by = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // relationship_notifications: claimer_user_id (has ON DELETE SET NULL)
+            try {
+                $stmt = $pdo->prepare("UPDATE relationship_notifications SET claimer_user_id = NULL WHERE claimer_user_id = ?");
+                $stmt->execute([$userId]);
+            } catch (Exception $e) { /* Table might not exist */ }
+
+            // Finally delete from users table
+            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+
+            $pdo->commit();
+
+            $message = "User deleted successfully! All related content has been removed.";
+            $messageType = 'success';
+
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $message = "Error deleting user: " . $e->getMessage();
+            $messageType = 'error';
+        }
     }
 }
 
@@ -113,7 +300,7 @@ try {
     <main class="main-content">
         <div class="container">
             <h1 class="page-title">🔑 Admin User Management</h1>
-            <p>Manage admin privileges for family members. Use this to banish poltergeist accounts and grant proper admin access.</p>
+            <p>Manage admin privileges and user accounts for family members.</p>
             
             <?php if ($message): ?>
                 <div class="message <?= $messageType ?>">
@@ -162,10 +349,10 @@ try {
                                 <form method="POST" class="toggle-form" style="display: inline;">
                                     <input type="hidden" name="action" value="toggle_admin">
                                     <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
-                                    
+
                                     <?php if ($user['is_admin']): ?>
                                         <input type="hidden" name="make_admin" value="0">
-                                        <button type="submit" class="btn btn-outline" 
+                                        <button type="submit" class="btn btn-outline"
                                                <?= $_SESSION['user_id'] == $user['id'] ? 'onclick="return confirm(\'Remove your own admin privileges? You won\\\'t be able to access this page after!\')"' : '' ?>>
                                             Remove Admin
                                         </button>
@@ -176,27 +363,27 @@ try {
                                         </button>
                                     <?php endif; ?>
                                 </form>
+
+                                <?php if ($_SESSION['user_id'] != $user['id']): ?>
+                                <form method="POST" class="toggle-form" style="display: inline; margin-left: 5px;">
+                                    <input type="hidden" name="action" value="delete_user">
+                                    <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
+                                    <button type="submit" class="btn btn-outline"
+                                            style="background: #fee2e2; color: #991b1b; border-color: #ef4444;"
+                                            onclick="return confirm('Are you sure you want to delete <?= htmlspecialchars($user['display_name']) ?>? This will permanently delete all their content and cannot be undone!')">
+                                        Delete User
+                                    </button>
+                                </form>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
-            
-            <div style="margin-top: 30px;">
-                <h3>Next Steps</h3>
-                <ol>
-                    <li><strong>Grant yourself admin privileges</strong> if you're not already an admin</li>
-                    <li><strong>Logout completely</strong> using the logout link</li>
-                    <li><strong>Register a new account</strong> properly through the registration system</li>
-                    <li><strong>Have an existing admin approve your new account</strong></li>
-                    <li><strong>Login with your new account</strong> and test that everything works</li>
-                    <li><strong>Delete the poltergeist account</strong> once the new one is working</li>
-                </ol>
-            </div>
-            
+
             <div style="margin-top: 20px;">
-                <a href="index.php" class="btn btn-secondary">Back to Dashboard</a>
-                <a href="logout.php" class="btn btn-primary">Complete Logout (Exorcise Poltergeist)</a>
+                <a href="admin.php" class="btn btn-secondary">Back to Admin Dashboard</a>
+                <a href="index.php" class="btn btn-primary">Back to Main Dashboard</a>
             </div>
         </div>
     </main>

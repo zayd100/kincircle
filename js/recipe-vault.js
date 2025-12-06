@@ -117,6 +117,7 @@ class RecipeVault {
         if (window.recipeVaultData && window.recipeVaultData.recipes) {
             this.recipes = window.recipeVaultData.recipes;
             this.filteredRecipes = [...this.recipes];
+            this.renderRecipeGrid();
             return;
         }
         

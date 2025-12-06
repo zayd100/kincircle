@@ -10,26 +10,30 @@ try {
         echo json_encode(['success' => true, 'stats' => ['total_tags' => 0, 'total_people' => 0]]);
         exit;
     }
-    
-    // Get photo tag statistics
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM photo_tags");
+
+    // Get photo tag statistics from unified content_tags + people system
+    $stmt = $pdo->query("
+        SELECT COUNT(*) as total
+        FROM content_tags
+        WHERE content_type = 'photo'
+    ");
     $totalTags = $stmt->fetch()['total'];
-    
-    $stmt = $pdo->query("SELECT COUNT(DISTINCT person_name) as total FROM photo_tags");
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM people");
     $totalPeople = $stmt->fetch()['total'];
-    
+
     // Get photos with tags count
     $stmt = $pdo->query("
-        SELECT COUNT(DISTINCT pt.photo_id) as tagged_photos,
-               COUNT(DISTINCT ps.id) as total_photos
-        FROM photo_tags pt
-        RIGHT JOIN photo_submissions ps ON pt.photo_id = ps.id
-        WHERE ps.status = 'approved'
+        SELECT COUNT(DISTINCT ct.content_id) as tagged_photos,
+               (SELECT COUNT(*) FROM photo_submissions WHERE status = 'approved') as total_photos
+        FROM content_tags ct
+        JOIN photo_submissions ps ON ct.content_id = ps.id
+        WHERE ct.content_type = 'photo' AND ps.status = 'approved'
     ");
     $photoStats = $stmt->fetch();
-    
+
     echo json_encode([
-        'success' => true, 
+        'success' => true,
         'stats' => [
             'total_tags' => $totalTags,
             'total_people' => $totalPeople,
@@ -37,7 +41,7 @@ try {
             'total_photos' => $photoStats['total_photos'] ?: 0
         ]
     ]);
-    
+
 } catch (Exception $e) {
     echo json_encode(['success' => true, 'stats' => ['total_tags' => 0, 'total_people' => 0]]);
 }

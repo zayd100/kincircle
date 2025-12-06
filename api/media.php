@@ -1,23 +1,23 @@
 <?php
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../lib/R2.php';
+
 requireLogin();
 
 header('Content-Type: application/json');
 
-// Helper function to determine media type from mime type
 function determineMediaType($mimeType) {
     if (!$mimeType) return 'document';
-
     if (strpos($mimeType, 'video/') === 0) return 'video';
     if (strpos($mimeType, 'audio/') === 0) return 'audio';
-    if (strpos($mimeType, 'application/pdf') === 0) return 'document';
-    if (strpos($mimeType, 'application/') === 0) return 'document';
-
     return 'document';
 }
 
 $action = $_GET['action'] ?? 'approved';
 $method = $_SERVER['REQUEST_METHOD'];
+
+// Initialize R2 for URL generation
+$r2 = new R2();
 
 try {
     switch ($action) {
@@ -36,16 +36,16 @@ try {
             $stmt->execute();
             $mediaResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Map photo_submissions columns to media format
             $media = [];
             foreach ($mediaResults as $item) {
+                if (empty($item['storage_key'])) continue;
+                $filePath = $r2->getDownloadUrl($item['storage_key']);
                 $media[] = [
                     'id' => $item['id'],
-                    'title' => $item['photo_title'] ?: $item['event_name'] ?: 'Untitled Document',
-                    'subtitle' => $item['description'] ?: '',
-                    'description' => $item['photo_description'] ?: $item['description'] ?: '',
+                    'title' => $item['photo_title'] ?: $item['event_name'] ?: 'Untitled',
+                    'description' => $item['description'] ?: '',
                     'type' => determineMediaType($item['mime_type'] ?? $item['file_type']),
-                    'file_path' => '../uploads/albums/' . $item['final_album'] . '/' . $item['filename'],
+                    'file_path' => $filePath,
                     'file_size' => $item['file_size'],
                     'uploaded_by' => $item['uploader_name'] ?: 'Unknown',
                     'date_added' => $item['uploaded_at'],
@@ -58,7 +58,6 @@ try {
             break;
 
         case 'all':
-            // Get all media files (admin only)
             if (!isAdmin()) {
                 throw new Exception('Access denied');
             }
@@ -74,18 +73,14 @@ try {
             $stmt->execute();
             $mediaResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Map photo_submissions columns to media format
             $media = [];
             foreach ($mediaResults as $item) {
-                $filePath = ($item['status'] === 'approved')
-                    ? '../uploads/albums/' . $item['final_album'] . '/' . $item['filename']
-                    : '../uploads/pending/' . $item['filename'];
-
+                if (empty($item['storage_key'])) continue;
+                $filePath = $r2->getDownloadUrl($item['storage_key']);
                 $media[] = [
                     'id' => $item['id'],
-                    'title' => $item['photo_title'] ?: $item['event_name'] ?: 'Untitled Document',
-                    'subtitle' => $item['description'] ?: '',
-                    'description' => $item['photo_description'] ?: $item['description'] ?: '',
+                    'title' => $item['photo_title'] ?: $item['event_name'] ?: 'Untitled',
+                    'description' => $item['description'] ?: '',
                     'type' => determineMediaType($item['mime_type'] ?? $item['file_type']),
                     'file_path' => $filePath,
                     'file_size' => $item['file_size'],
@@ -146,17 +141,20 @@ try {
                 throw new Exception('Failed to save uploaded file');
             }
             
-            // Save to database
+            // Save to database (using photo_submissions table for all media)
             $stmt = $pdo->prepare("
-                INSERT INTO media_files (filename, original_name, file_type, file_size, title, description, category, uploaded_by, status, uploaded_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
+                INSERT INTO photo_submissions (
+                    filename, original_name, file_type, mime_type, file_size,
+                    event_name, description, suggested_album, uploader_id, status, uploaded_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
             ");
             $stmt->execute([
                 $filename,
                 $file['name'],
                 $file['type'],
+                $file['type'],
                 $file['size'],
-                $title,
+                $title ?: 'Media Upload',
                 $description,
                 $category,
                 $_SESSION['user_id']

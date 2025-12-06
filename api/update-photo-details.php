@@ -25,7 +25,9 @@ try {
     $title = $data['title'] ?? null;
     $description = $data['description'] ?? null;
     $date = $data['date'] ?? null;
-    $event = $data['event'] ?? null;
+    $location = $data['location'] ?? null;
+    $city = $data['city'] ?? null;
+    $state = $data['state'] ?? null;
 
     if (!$filename || !$album) {
         throw new Exception('Filename and album are required');
@@ -62,9 +64,19 @@ try {
         $updateValues[] = $date;
     }
 
-    if ($event !== null) {
-        $updateFields[] = "event_name = ?";
-        $updateValues[] = $event;
+    if ($location !== null) {
+        $updateFields[] = "location_name = ?";
+        $updateValues[] = $location;
+    }
+
+    if ($city !== null) {
+        $updateFields[] = "location_city = ?";
+        $updateValues[] = $city;
+    }
+
+    if ($state !== null) {
+        $updateFields[] = "location_state = ?";
+        $updateValues[] = $state;
     }
 
     if (empty($updateFields)) {
@@ -81,9 +93,14 @@ try {
         WHERE filename = ? AND final_album = ?
     ");
 
-    $updateStmt->execute($updateValues);
+    $success = $updateStmt->execute($updateValues);
+    $rowsAffected = $updateStmt->rowCount();
 
-    error_log("Updated photo details for: $filename in album: $album");
+    error_log("Updated photo details for: $filename in album: $album (rows affected: $rowsAffected)");
+
+    if ($rowsAffected === 0) {
+        error_log("WARNING: Update executed but no rows were affected. Photo may not exist or columns may not exist in database.");
+    }
 
     echo json_encode([
         'success' => true,

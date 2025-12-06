@@ -401,25 +401,81 @@ class MessagesAdmin {
     
     async toggleThreadPin(threadId) {
         const thread = this.boardThreads.find(t => t.id === threadId);
-        thread.isPinned = !thread.isPinned;
-        this.showNotification(`Thread ${thread.isPinned ? 'pinned' : 'unpinned'}`, 'success');
-        this.render(document.querySelector('.messages-admin').parentElement);
+        const newPinState = !thread.isPinned;
+
+        try {
+            const response = await fetch('/api/messages.php?action=pin', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: threadId, is_pinned: newPinState ? 1 : 0 })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                thread.isPinned = newPinState;
+                this.showNotification(`Thread ${newPinState ? 'pinned' : 'unpinned'}`, 'success');
+                this.render(document.querySelector('.messages-admin').parentElement);
+            } else {
+                throw new Error(result.error || 'Failed to pin thread');
+            }
+        } catch (error) {
+            console.error('Error pinning thread:', error);
+            this.showNotification('Failed to pin thread: ' + error.message, 'error');
+        }
     }
-    
+
     async toggleThreadLock(threadId) {
         const thread = this.boardThreads.find(t => t.id === threadId);
-        thread.isLocked = !thread.isLocked;
-        this.showNotification(`Thread ${thread.isLocked ? 'locked' : 'unlocked'}`, 'success');
-        this.render(document.querySelector('.messages-admin').parentElement);
+        const newLockState = !thread.isLocked;
+
+        try {
+            const response = await fetch('/api/messages.php?action=lock', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: threadId, is_locked: newLockState ? 1 : 0 })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                thread.isLocked = newLockState;
+                this.showNotification(`Thread ${newLockState ? 'locked' : 'unlocked'}`, 'success');
+                this.render(document.querySelector('.messages-admin').parentElement);
+            } else {
+                throw new Error(result.error || 'Failed to lock thread');
+            }
+        } catch (error) {
+            console.error('Error locking thread:', error);
+            this.showNotification('Failed to lock thread: ' + error.message, 'error');
+        }
     }
     
     async deleteThread(threadId) {
         if (confirm('Are you sure you want to delete this thread? This action cannot be undone.')) {
-            const thread = this.boardThreads.find(t => t.id === threadId);
-            thread.status = 'deleted';
-            this.showNotification('Thread deleted', 'success');
-            this.updateStats();
-            this.render(document.querySelector('.messages-admin').parentElement);
+            try {
+                // Actually delete from database via API
+                const response = await fetch('/api/messages.php', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: threadId })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Remove from local array
+                    this.boardThreads = this.boardThreads.filter(t => t.id !== threadId);
+                    this.showNotification('Thread deleted successfully', 'success');
+                    this.updateStats();
+                    this.render(document.querySelector('.messages-admin').parentElement);
+                } else {
+                    throw new Error(result.error || 'Failed to delete thread');
+                }
+            } catch (error) {
+                console.error('Error deleting thread:', error);
+                this.showNotification('Failed to delete thread: ' + error.message, 'error');
+            }
         }
     }
     
@@ -441,8 +497,8 @@ class MessagesAdmin {
     saveSettings() { this.showNotification('Settings saved', 'success'); }
 }
 
-// Initialize the messages admin
-const messagesAdmin = new MessagesAdmin();
+// Initialize the messages admin and make it globally accessible
+window.messagesAdmin = new MessagesAdmin();
 
 // Register with admin core when it's ready
 if (window.adminCore) {
@@ -451,8 +507,8 @@ if (window.adminCore) {
         title: 'Message Moderation',
         icon: '💬',
         priority: 2,
-        getStats: () => messagesAdmin.getStats(),
-        render: (container) => messagesAdmin.render(container)
+        getStats: () => window.messagesAdmin.getStats(),
+        render: (container) => window.messagesAdmin.render(container)
     });
 } else {
     // Wait for admin core to load
@@ -463,8 +519,8 @@ if (window.adminCore) {
                 title: 'Message Moderation',
                 icon: '💬',
                 priority: 2,
-                getStats: () => messagesAdmin.getStats(),
-                render: (container) => messagesAdmin.render(container)
+                getStats: () => window.messagesAdmin.getStats(),
+                render: (container) => window.messagesAdmin.render(container)
             });
         }
     });
@@ -473,33 +529,50 @@ if (window.adminCore) {
 // CSS for messages admin styling
 const messagesAdminStyle = document.createElement('style');
 messagesAdminStyle.textContent = `
-    .messages-admin { max-width: 1200px; }
+    .messages-admin { max-width: 1200px; color: #1f2937; }
+    .messages-admin h2, .messages-admin h3 { color: #111827; }
+    .messages-admin p { color: #6b7280; }
     .admin-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid #e5e7eb; }
+    .header-info h2 { color: #111827; margin-bottom: 0.25rem; }
+    .header-info p { color: #6b7280; }
     .stats-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .admin-stats-grid .stat-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; text-align: center; }
+    .admin-stats-grid .stat-number { font-size: 2.5rem; font-weight: 700; color: #111827; margin-bottom: 0.5rem; }
+    .admin-stats-grid .stat-label { color: #6b7280; font-size: 0.875rem; font-weight: 500; }
     .moderation-tabs { display: flex; border-bottom: 2px solid #e5e7eb; margin-bottom: 2rem; gap: 0.5rem; }
     .mod-tab { background: none; border: none; padding: 1rem 1.5rem; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s ease; }
     .mod-tab:hover { color: #374151; background: #f9fafb; }
     .mod-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; background: #f8fafc; }
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
-    .report-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+    .report-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; color: #1f2937; }
     .report-card.urgent { border-left: 4px solid #ef4444; background: #fef2f2; }
+    .report-header, .report-content { color: #1f2937; }
+    .report-content h4 { color: #111827; }
+    .report-detail-label { color: #6b7280; font-weight: 500; }
+    .report-detail-value { color: #374151; }
     .report-actions { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
     .report-actions button { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
     .btn-view { background: #f3f4f6; color: #374151; }
     .btn-approve { background: #d1fae5; color: #065f46; }
     .btn-warning { background: #fef3c7; color: #92400e; }
     .btn-danger { background: #fee2e2; color: #991b1b; }
-    .thread-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 0.5rem; background: white; }
+    .thread-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 0.5rem; background: white; color: #1f2937; }
     .thread-row.reported { border-left: 4px solid #ef4444; background: #fef2f2; }
+    .thread-info { flex: 1; min-width: 0; }
+    .thread-title { color: #1f2937; font-weight: 600; margin-bottom: 0.5rem; }
     .thread-actions { display: flex; gap: 0.5rem; }
-    .action-btn { background: none; border: 1px solid #e5e7eb; padding: 0.5rem; border-radius: 6px; cursor: pointer; }
+    .action-btn { background: white; border: 1px solid #e5e7eb; padding: 0.5rem; border-radius: 6px; cursor: pointer; color: #374151; }
     .action-btn:hover { background: #f9fafb; }
-    .action-btn.danger:hover { background: #fee2e2; border-color: #ef4444; }
+    .action-btn.danger:hover { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
     .user-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-    .action-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; text-align: center; }
+    .action-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; text-align: center; color: #1f2937; }
+    .action-card h4 { color: #111827; margin: 0.5rem 0; }
+    .action-card p { color: #6b7280; }
     .action-icon { font-size: 2rem; margin-bottom: 1rem; }
-    .settings-section { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .settings-section { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; color: #1f2937; }
+    .settings-section h3 { color: #111827; margin-bottom: 1rem; }
     .setting-group { display: flex; flex-direction: column; gap: 0.75rem; }
     .setting-group label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
     .empty-state { text-align: center; padding: 3rem; color: #6b7280; }

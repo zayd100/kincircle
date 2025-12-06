@@ -684,20 +684,96 @@
 }
 
 @media (max-width: 480px) {
+    .calendar-universe {
+        padding: 0.5rem;
+    }
+
+    .calendar-title {
+        font-size: 1.5rem;
+    }
+
+    .calendar-subtitle {
+        font-size: 1rem;
+    }
+
+    .time-machine-nav {
+        padding: 0.75rem;
+    }
+
+    .current-period {
+        font-size: 1.2rem;
+    }
+
+    .decade-button {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+    }
+
+    /* Make calendar horizontally scrollable on very small screens */
+    .calendar-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .calendar-grid {
+        min-width: 320px;
+    }
+
+    .calendar-header-day {
+        padding: 0.5rem 0.25rem;
+        font-size: 0.7rem;
+        letter-spacing: 0;
+    }
+
     .calendar-day {
         height: 60px;
         max-height: 60px;
+        min-height: 60px;
         padding: 0.25rem;
+        min-width: 45px;
     }
-    
+
     .day-number {
-        font-size: 0.9rem;
-        margin-bottom: 0.25rem;
+        font-size: 0.85rem;
+        margin-bottom: 0.15rem;
     }
-    
+
     .event-indicator {
-        font-size: 0.6rem;
-        padding: 0.15rem 0.3rem;
+        font-size: 0.55rem;
+        padding: 0.1rem 0.2rem;
+        border-left-width: 2px;
     }
-    
+
+    .nav-button,
+    .nav-button-small {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+    }
+
+    .action-buttons {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 360px) {
+    .calendar-grid {
+        min-width: 300px;
+    }
+
+    .calendar-day {
+        min-width: 42px;
+        height: 55px;
+        max-height: 55px;
+    }
+
+    .calendar-header-day {
+        font-size: 0.65rem;
+        padding: 0.4rem 0.15rem;
+    }
+
+    .day-number {
+        font-size: 0.8rem;
+    }
 }

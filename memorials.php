@@ -85,7 +85,7 @@ try {
         <div class="slideout-header">
             <button class="close-slideout" id="closeSlideout">← Back to List</button>
         </div>
-
+        
         <div class="slideout-content" id="slideoutContent">
             <!-- Content will be populated by JavaScript -->
         </div>

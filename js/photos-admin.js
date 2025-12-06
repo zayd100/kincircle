@@ -6,13 +6,13 @@ class PhotosAdmin {
         this.albums = [];
         this.currentPhoto = null;
         this.selectedSubmissions = new Set();
-        
+        this.dataLoaded = false;
+
         this.init();
     }
-    
+
     async init() {
-        await this.loadDashboardData();
-        // Don't setup listeners or update stats yet - wait for render
+        // Don't load data until module is rendered
     }
     
     async loadDashboardData() {
@@ -20,29 +20,41 @@ class PhotosAdmin {
             // Load pending submissions
             const pendingResponse = await fetch('/api/pending-submissions.php');
             if (pendingResponse.ok) {
-                const data = await pendingResponse.json();
-                // Ensure we have an array
-                this.pendingSubmissions = Array.isArray(data) ? data : 
-                                         (data.submissions ? data.submissions : []);
+                try {
+                    const data = await pendingResponse.json();
+                    // Ensure we have an array
+                    this.pendingSubmissions = Array.isArray(data) ? data :
+                                             (data.submissions ? data.submissions : []);
+                } catch (parseError) {
+                    console.error('Failed to parse pending submissions response:', parseError);
+                    const text = await pendingResponse.text();
+                    console.error('Raw response:', text.substring(0, 500));
+                    this.pendingSubmissions = [];
+                }
             } else {
-                console.log('Pending submissions API not available, using empty array');
+                console.log('Pending submissions API returned status:', pendingResponse.status);
                 this.pendingSubmissions = [];
             }
-            
+
             // Load albums
             const albumsResponse = await fetch('/api/photo-albums.php');
             if (albumsResponse.ok) {
-                const data = await albumsResponse.json();
-                // Ensure we have an array
-                this.albums = Array.isArray(data) ? data : 
-                             (data.albums ? data.albums : []);
+                try {
+                    const data = await albumsResponse.json();
+                    // Ensure we have an array
+                    this.albums = Array.isArray(data) ? data :
+                                 (data.albums ? data.albums : []);
+                } catch (parseError) {
+                    console.error('Failed to parse albums response:', parseError);
+                    this.albums = [];
+                }
             } else {
-                console.log('Albums API not available, using empty array');
+                console.log('Albums API returned status:', albumsResponse.status);
                 this.albums = [];
             }
-            
+
             // Don't render yet - wait for render() method to be called
-            
+
         } catch (error) {
             console.error('Error loading dashboard data:', error);
             // Initialize with empty arrays to prevent map errors
@@ -114,10 +126,24 @@ class PhotosAdmin {
         }));
     }
     
+    // Helper to ensure URL is absolute
+    ensureAbsoluteUrl(url) {
+        if (!url) return '';
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url;
+        } else if (url.includes('r2.cloudflarestorage.com')) {
+            return 'https://' + url.replace(/^\/+/, '');
+        }
+        return url;
+    }
+
     renderSubmissionGroup(group) {
         const submission = group.submissions[0]; // For now, one submission per group
         const uploadDate = new Date(submission.uploaded_at).toLocaleDateString();
-        
+
+        // Ensure file_path is an absolute URL
+        const thumbnailUrl = this.ensureAbsoluteUrl(submission.file_path);
+
         return `
             <div class="photo-submission">
                 <div class="submission-header">
@@ -128,14 +154,14 @@ class PhotosAdmin {
                         </div>
                     </div>
                     <div class="submission-actions">
-                        <input type="checkbox" class="submission-select" data-filename="${submission.filename}" onchange="handleCheckboxChange(this)">
+                        <input type="checkbox" class="submission-select" data-id="${submission.id}" onchange="handleCheckboxChange(this)">
                     </div>
                 </div>
-                
+
                 <div class="submission-content">
                     <div class="photos-grid">
-                        <div class="photo-thumbnail" onclick="reviewPhoto('${submission.filename}')">
-                            <img src="/uploads/pending/${submission.filename}" alt="${submission.original_name}">
+                        <div class="photo-thumbnail" onclick="reviewPhoto('${submission.id}')">
+                            <img src="${thumbnailUrl}" alt="${submission.original_name}" onerror="this.src='/images/placeholder.png'">
                             <div class="photo-overlay">
                                 <span>👁️ Review</span>
                             </div>
@@ -169,13 +195,13 @@ class PhotosAdmin {
                     ` : ''}
                     
                     <div class="submission-actions">
-                        <button class="btn-danger" onclick="quickReject('${submission.filename}')">
+                        <button class="btn-danger" onclick="quickReject('${submission.id}')">
                             ❌ Reject
                         </button>
-                        <button class="btn-secondary" onclick="reviewPhoto('${submission.filename}')">
+                        <button class="btn-secondary" onclick="reviewPhoto('${submission.id}')">
                             👁️ Review
                         </button>
-                        <button class="btn-primary" onclick="quickApprove('${submission.filename}')">
+                        <button class="btn-primary" onclick="quickApprove('${submission.id}')">
                             ✅ Quick Approve
                         </button>
                     </div>
@@ -233,8 +259,9 @@ class PhotosAdmin {
         });
     }
     
-    findSubmission(filename) {
-        return this.pendingSubmissions.find(s => s.filename === filename);
+    findSubmission(id) {
+        // Support both ID and filename for backward compatibility
+        return this.pendingSubmissions.find(s => s.id == id || s.filename === id);
     }
     
     async getStats() {
@@ -251,6 +278,10 @@ class PhotosAdmin {
     }
     
     async render(container) {
+        // Always load fresh data when rendering the module
+        await this.loadDashboardData();
+        this.dataLoaded = true;
+
         container.innerHTML = `
             <div class="photos-admin-panel">
                 <div class="admin-tabs">
@@ -317,9 +348,14 @@ class PhotosAdmin {
                 <div class="tab-content" id="tagsTab">
                     <div class="section-header">
                         <h3>🏷️ Photo Tag Management</h3>
-                        <button onclick="exportTags()" class="btn btn-secondary">
-                            📥 Export Tags
-                        </button>
+                        <div class="header-actions">
+                            <button onclick="cleanupOrphanedTags()" class="btn btn-secondary" title="Remove tags pointing to deleted photos">
+                                🧹 Cleanup Orphaned Tags
+                            </button>
+                            <button onclick="exportTags()" class="btn btn-secondary">
+                                📥 Export Tags
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="tag-stats">
@@ -517,34 +553,41 @@ class PhotosAdmin {
         try {
             const response = await fetch('/api/photo-tags/stats.php');
             if (response.ok) {
-                const stats = await response.json();
-                this.updateTagStats(stats);
+                const data = await response.json();
+                if (data.success && data.stats) {
+                    this.updateTagStats(data.stats);
+                }
                 this.loadTagsList();
             }
         } catch (error) {
-            console.log('Tag stats not available yet');
+            console.log('Tag stats not available yet:', error);
         }
     }
-    
+
     updateTagStats(stats) {
         const totalTagsEl = document.getElementById('totalTags');
         const uniquePeopleEl = document.getElementById('uniquePeople');
         const taggedPhotosEl = document.getElementById('taggedPhotos');
-        
-        if (totalTagsEl) totalTagsEl.textContent = stats.totalTags || 0;
-        if (uniquePeopleEl) uniquePeopleEl.textContent = stats.uniquePeople || 0;
-        if (taggedPhotosEl) taggedPhotosEl.textContent = stats.taggedPhotos || 0;
+
+        // API returns snake_case: total_tags, total_people, tagged_photos
+        if (totalTagsEl) totalTagsEl.textContent = stats.total_tags || 0;
+        if (uniquePeopleEl) uniquePeopleEl.textContent = stats.total_people || 0;
+        if (taggedPhotosEl) taggedPhotosEl.textContent = stats.tagged_photos || 0;
     }
-    
+
     async loadTagsList() {
         try {
             const response = await fetch('/api/photo-tags/people.php');
             if (response.ok) {
-                const people = await response.json();
-                this.renderTagsList(people);
+                const data = await response.json();
+                if (data.success && data.people) {
+                    this.renderTagsList(data.people);
+                } else {
+                    this.renderTagsList([]);
+                }
             }
         } catch (error) {
-            console.log('Tags list not available yet');
+            console.log('Tags list not available yet:', error);
             const tagsList = document.getElementById('tagsList');
             if (tagsList) {
                 tagsList.innerHTML = `
@@ -555,12 +598,12 @@ class PhotosAdmin {
             }
         }
     }
-    
+
     renderTagsList(people) {
         const tagsList = document.getElementById('tagsList');
         if (!tagsList) return;
-        
-        if (people.length === 0) {
+
+        if (!people || people.length === 0) {
             tagsList.innerHTML = `
                 <div class="no-tags-message">
                     <p>No tags created yet. Tags will appear here once photos are tagged with people.</p>
@@ -568,26 +611,32 @@ class PhotosAdmin {
             `;
             return;
         }
-        
-        tagsList.innerHTML = people.map(person => `
-            <div class="tag-item">
-                <div class="tag-info">
-                    <h4>${person.name}</h4>
-                    <span class="tag-count">${person.photo_count} photos</span>
+
+        // API returns person_name (from display_name), not name
+        tagsList.innerHTML = people.map(person => {
+            const personName = person.person_name || person.display_name || person.name || 'Unknown';
+            const personId = person.id || '';
+            const photoCount = person.photo_count || 0;
+            return `
+                <div class="tag-item" data-person-id="${personId}">
+                    <div class="tag-info">
+                        <h4>${personName}</h4>
+                        <span class="tag-count">${photoCount} photos</span>
+                    </div>
+                    <div class="tag-actions">
+                        <button onclick="editTag(${personId}, '${personName.replace(/'/g, "\\'")}')" class="btn btn-sm btn-secondary">
+                            ✏️ Edit
+                        </button>
+                        <button onclick="mergeTag(${personId}, '${personName.replace(/'/g, "\\'")}')" class="btn btn-sm btn-secondary">
+                            🔄 Merge
+                        </button>
+                        <button onclick="deleteTag(${personId}, '${personName.replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">
+                            🗑️ Delete
+                        </button>
+                    </div>
                 </div>
-                <div class="tag-actions">
-                    <button onclick="editTag('${person.name}')" class="btn btn-sm btn-secondary">
-                        ✏️ Edit
-                    </button>
-                    <button onclick="mergeTag('${person.name}')" class="btn btn-sm btn-secondary">
-                        🔄 Merge
-                    </button>
-                    <button onclick="deleteTag('${person.name}')" class="btn btn-sm btn-danger">
-                        🗑️ Delete
-                    </button>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
     
     showMessage(text, type = 'info') {
@@ -630,13 +679,23 @@ function showTab(tabName) {
     event.target.classList.add('active');
 }
 
-function refreshPending() {
-    photosAdmin.loadDashboardData();
+async function refreshPending() {
+    photosAdmin.showMessage('Refreshing...', 'info');
+    await photosAdmin.loadDashboardData();
+    photosAdmin.renderPendingPhotos();
+    photosAdmin.updateStats();
+
+    // Update the tab count
+    const pendingTab = document.querySelector('.tab-btn.active');
+    if (pendingTab && pendingTab.textContent.includes('Pending')) {
+        pendingTab.innerHTML = `📝 Pending Photos (${photosAdmin.pendingSubmissions.length})`;
+    }
+
     photosAdmin.showMessage('Refreshed pending submissions', 'success');
 }
 
-function reviewPhoto(filename) {
-    const submission = photosAdmin.findSubmission(filename);
+function reviewPhoto(id) {
+    const submission = photosAdmin.findSubmission(id);
     if (!submission) {
         photosAdmin.showMessage('Submission not found', 'error');
         return;
@@ -644,12 +703,12 @@ function reviewPhoto(filename) {
 
     photosAdmin.currentPhoto = submission;
 
-    // Store filename in modal data attribute for later use
+    // Store submission ID in modal data attribute for later use
     const photoModal = document.getElementById('photoModal');
-    photoModal.dataset.currentFilename = submission.filename;
+    photoModal.dataset.currentId = submission.id;
 
-    // Populate modal with submission data
-    document.getElementById('previewImage').src = `/uploads/pending/${submission.filename}`;
+    // Populate modal with submission data - ensure absolute URL
+    document.getElementById('previewImage').src = photosAdmin.ensureAbsoluteUrl(submission.file_path);
     document.getElementById('contextEvent').textContent = submission.event_name;
     document.getElementById('contextDate').textContent = submission.date_taken || 'Not specified';
     document.getElementById('contextPeople').textContent = submission.people_in_photo || 'Not specified';
@@ -687,10 +746,10 @@ async function approvePhoto() {
     const reviewerNotes = document.getElementById('reviewerNotes').value;
     const photoModal = document.getElementById('photoModal');
 
-    // Get filename from modal data attribute or currentPhoto
-    const filename = photoModal.dataset.currentFilename || (photosAdmin.currentPhoto && photosAdmin.currentPhoto.filename);
+    // Get submission ID from modal data attribute or currentPhoto
+    const submissionId = photoModal.dataset.currentId || (photosAdmin.currentPhoto && photosAdmin.currentPhoto.id);
 
-    if (!filename) {
+    if (!submissionId) {
         photosAdmin.showMessage('Photo information not found', 'error');
         return;
     }
@@ -714,7 +773,7 @@ async function approvePhoto() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                filename: filename,
+                id: submissionId,
                 album: albumSelect.value,
                 reviewerNotes: reviewerNotes
             })
@@ -728,7 +787,7 @@ async function approvePhoto() {
 
             // Remove from pending list
             photosAdmin.pendingSubmissions = photosAdmin.pendingSubmissions.filter(
-                s => s.filename !== filename
+                s => s.id != submissionId
             );
             photosAdmin.renderPendingPhotos();
             photosAdmin.updateStats();
@@ -750,10 +809,10 @@ async function rejectPhoto() {
     const reviewerNotes = document.getElementById('reviewerNotes').value;
     const photoModal = document.getElementById('photoModal');
 
-    // Get filename from modal data attribute or currentPhoto
-    const filename = photoModal.dataset.currentFilename || (photosAdmin.currentPhoto && photosAdmin.currentPhoto.filename);
+    // Get submission ID from modal data attribute or currentPhoto
+    const submissionId = photoModal.dataset.currentId || (photosAdmin.currentPhoto && photosAdmin.currentPhoto.id);
 
-    if (!filename) {
+    if (!submissionId) {
         photosAdmin.showMessage('Photo information not found', 'error');
         return;
     }
@@ -770,7 +829,7 @@ async function rejectPhoto() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                filename: filename,
+                id: submissionId,
                 reviewerNotes: reviewerNotes
             })
         });
@@ -783,7 +842,7 @@ async function rejectPhoto() {
 
             // Remove from pending list
             photosAdmin.pendingSubmissions = photosAdmin.pendingSubmissions.filter(
-                s => s.filename !== filename
+                s => s.id != submissionId
             );
             photosAdmin.renderPendingPhotos();
             photosAdmin.updateStats();
@@ -819,8 +878,8 @@ function requestMoreInfo() {
     closeModal();
 }
 
-async function quickApprove(filename) {
-    const submission = photosAdmin.findSubmission(filename);
+async function quickApprove(id) {
+    const submission = photosAdmin.findSubmission(id);
     if (!submission) return;
 
     // Use suggested album or prompt for one
@@ -837,7 +896,7 @@ async function quickApprove(filename) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                filename: filename,
+                id: submission.id,
                 album: album,
                 reviewerNotes: 'Quick approved'
             })
@@ -850,7 +909,7 @@ async function quickApprove(filename) {
 
             // Remove from pending
             photosAdmin.pendingSubmissions = photosAdmin.pendingSubmissions.filter(
-                s => s.filename !== filename
+                s => s.id != submission.id
             );
             photosAdmin.renderPendingPhotos();
             photosAdmin.updateStats();
@@ -868,8 +927,11 @@ async function quickApprove(filename) {
     }
 }
 
-async function quickReject(filename) {
+async function quickReject(id) {
     if (!confirm('Are you sure you want to reject this photo?')) return;
+
+    const submission = photosAdmin.findSubmission(id);
+    if (!submission) return;
 
     try {
         const response = await fetch('/api/reject-photo.php', {
@@ -878,7 +940,7 @@ async function quickReject(filename) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                filename: filename,
+                id: submission.id,
                 reviewerNotes: 'Quick rejected'
             })
         });
@@ -890,7 +952,7 @@ async function quickReject(filename) {
 
             // Remove from pending
             photosAdmin.pendingSubmissions = photosAdmin.pendingSubmissions.filter(
-                s => s.filename !== filename
+                s => s.id != submission.id
             );
             photosAdmin.renderPendingPhotos();
             photosAdmin.updateStats();
@@ -1066,6 +1128,39 @@ function deleteTag(tagName) {
 
 function exportTags() {
     photosAdmin.showMessage('Export tags feature coming soon', 'info');
+}
+
+async function cleanupOrphanedTags() {
+    if (!confirm('This will remove all tags pointing to deleted photos. Continue?')) {
+        return;
+    }
+
+    try {
+        photosAdmin.showMessage('Cleaning up orphaned tags...', 'info');
+
+        const response = await fetch('/api/cleanup-orphan-tags.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const total = (data.results?.photo_tags_removed || 0) + (data.results?.content_tags_removed || 0);
+            if (total > 0) {
+                photosAdmin.showMessage(`Cleaned up ${total} orphaned tag(s)`, 'success');
+                // Refresh tag data
+                photosAdmin.loadTagData();
+            } else {
+                photosAdmin.showMessage('No orphaned tags found - everything is clean!', 'success');
+            }
+        } else {
+            throw new Error(data.error || 'Cleanup failed');
+        }
+    } catch (error) {
+        console.error('Orphan cleanup error:', error);
+        photosAdmin.showMessage('Error cleaning up tags: ' + error.message, 'error');
+    }
 }
 
 // Register module with admin core

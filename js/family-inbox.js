@@ -188,8 +188,12 @@ class FamilyInbox {
         // Filter conversations
         let filteredConversations = this.filterConversations();
         
-        // Sort by last message time
-        filteredConversations.sort((a, b) => b.lastMessage.timestamp - a.lastMessage.timestamp);
+        // Sort by last message time (handle string dates)
+        filteredConversations.sort((a, b) => {
+            const timeA = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+            const timeB = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+            return timeB - timeA;
+        });
         
         // Render conversations
         filteredConversations.forEach((conversation, index) => {
@@ -233,17 +237,21 @@ class FamilyInbox {
         const div = document.createElement('div');
         div.className = `conversation-item ${conversation.unreadCount > 0 ? 'unread' : ''} ${this.activeConversation?.id === conversation.id ? 'active' : ''}`;
         div.onclick = () => this.openConversation(conversation);
-        
-        const otherParticipants = conversation.participants.filter(p => p.id !== this.currentUser.id);
+
+        const currentUserId = this.currentUser?.id;
+        const otherParticipants = (conversation.participants || []).filter(p => p.id !== currentUserId);
         const isGroup = conversation.type === 'group';
-        const displayName = isGroup ? conversation.name : otherParticipants[0]?.name || 'Unknown';
-        const avatar = isGroup ? '👥' : otherParticipants[0]?.initials || '?';
+        const displayName = isGroup ? conversation.name : (otherParticipants[0]?.name || conversation.name || 'Unknown');
+        const avatar = isGroup ? '👥' : (otherParticipants[0]?.initials || displayName?.charAt(0)?.toUpperCase() || '?');
         const status = isGroup ? null : otherParticipants[0]?.status;
-        
-        const participantsList = isGroup 
+
+        const participantsList = isGroup
             ? otherParticipants.slice(0, 3).map(p => p.name).join(', ') + (otherParticipants.length > 3 ? '...' : '')
             : otherParticipants[0]?.name || '';
-        
+
+        const lastMessage = conversation.lastMessage || {};
+        const isFromMe = currentUserId && lastMessage.senderId == currentUserId;
+
         div.innerHTML = `
             <div class="conversation-header">
                 <div class="conversation-avatar ${isGroup ? 'group' : 'single'}">
@@ -254,29 +262,37 @@ class FamilyInbox {
                     <div class="conversation-name">${displayName}</div>
                     ${isGroup ? `<div class="conversation-participants">${participantsList}</div>` : ''}
                 </div>
-                <div class="conversation-time">${this.formatTime(conversation.lastMessage.timestamp)}</div>
+                <div class="conversation-time">${this.formatTime(lastMessage.timestamp)}</div>
             </div>
             <div class="conversation-preview ${conversation.unreadCount > 0 ? 'unread' : ''}">
-                ${conversation.lastMessage.senderId === this.currentUser.id ? 'You: ' : ''}${conversation.lastMessage.content}
+                ${isFromMe ? 'You: ' : ''}${lastMessage.content || ''}
             </div>
         `;
-        
+
         return div;
     }
     
-    formatTime(date) {
+    formatTime(dateInput) {
+        if (!dateInput) return '';
+
+        // Convert string to Date if needed
+        const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+
+        // Check if date is valid
+        if (isNaN(date.getTime())) return '';
+
         const now = new Date();
         const diff = now - date;
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const days = Math.floor(hours / 24);
-        
+
         if (diff < 1000 * 60) return 'just now';
         if (hours < 1) return `${Math.floor(diff / (1000 * 60))}m`;
         if (hours < 24) return `${hours}h`;
         if (days < 7) return `${days}d`;
-        
-        return date.toLocaleDateString('en-US', { 
-            month: 'short', 
+
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
             day: 'numeric',
             year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
         });
@@ -320,8 +336,34 @@ class FamilyInbox {
         console.log('Searching for:', query);
     }
     
+    closeConversation() {
+        this.activeConversation = null;
+
+        // Remove active class from inbox container (for mobile slide behavior)
+        document.querySelector('.inbox-container').classList.remove('conversation-open');
+
+        // Reset chat area to welcome state
+        const chatArea = document.getElementById('chatArea');
+        chatArea.innerHTML = `
+            <div class="chat-welcome">
+                <div class="welcome-content">
+                    <div class="welcome-icon">💝</div>
+                    <h2>Welcome to Your Family Inbox</h2>
+                    <p>Stay connected with private conversations</p>
+                    <p class="welcome-subtitle">Select a conversation or start a new message</p>
+                </div>
+            </div>
+        `;
+
+        // Update conversation list UI
+        this.renderConversations();
+    }
+
     openConversation(conversation) {
         this.activeConversation = conversation;
+
+        // Add class for mobile slide behavior
+        document.querySelector('.inbox-container').classList.add('conversation-open');
         
         // Mark as read
         if (conversation.unreadCount > 0) {
@@ -338,9 +380,10 @@ class FamilyInbox {
     
     async renderChatArea(conversation) {
         const chatArea = document.getElementById('chatArea');
-        const otherParticipants = conversation.participants.filter(p => p.id !== this.currentUser.id);
+        const currentUserId = this.currentUser?.id;
+        const otherParticipants = (conversation.participants || []).filter(p => p.id !== currentUserId);
         const isGroup = conversation.type === 'group';
-        const displayName = isGroup ? conversation.name : otherParticipants[0]?.name || 'Unknown';
+        const displayName = isGroup ? conversation.name : (otherParticipants[0]?.name || conversation.name || 'Unknown');
         const status = isGroup ? `${otherParticipants.length} members` : otherParticipants[0]?.status || 'offline';
         
         // Show loading state first
@@ -370,9 +413,7 @@ class FamilyInbox {
                     </div>
                 </div>
                 <div class="chat-actions">
-                    <button class="chat-action-btn" title="Call">📞</button>
-                    <button class="chat-action-btn" title="Video call">📹</button>
-                    <button class="chat-action-btn" title="More options">⋯</button>
+                    <button class="chat-action-btn back-to-list" title="Back to messages" onclick="inbox.closeConversation()">←</button>
                 </div>
             </div>
             
@@ -424,15 +465,14 @@ class FamilyInbox {
     
     
     createMessageHTML(message) {
-        const isFromCurrentUser = message.senderId === this.currentUser.id;
+        const currentUserId = this.currentUser?.id;
+        const isFromCurrentUser = currentUserId && message.senderId == currentUserId;
         const messageClass = isFromCurrentUser ? 'sent' : 'received';
-        
+
         return `
-            <div class="message-item ${messageClass}">
-                <div class="message-bubble ${messageClass}">
-                    <div class="message-content">${message.content}</div>
-                    <div class="message-time">${this.formatTime(message.timestamp)}</div>
-                </div>
+            <div class="message ${messageClass}">
+                <div class="message-content">${message.content || ''}</div>
+                <div class="message-time">${this.formatTime(message.timestamp)}</div>
             </div>
         `;
     }
@@ -516,14 +556,18 @@ class FamilyInbox {
     }
     
     openComposeModal() {
-        document.getElementById('composeModal').style.display = 'flex';
+        const modal = document.getElementById('composeModal');
+        modal.classList.add('active');
+        modal.style.display = 'flex';
         document.getElementById('recipientInput').focus();
         this.selectedRecipients = [];
         this.renderSelectedRecipients();
     }
-    
+
     closeComposeModal() {
-        document.getElementById('composeModal').style.display = 'none';
+        const modal = document.getElementById('composeModal');
+        modal.classList.remove('active');
+        modal.style.display = 'none';
         document.getElementById('composeForm').reset();
         this.selectedRecipients = [];
         this.hideRecipientSuggestions();
@@ -652,7 +696,9 @@ class FamilyInbox {
     }
     
     openQuickContactModal(user, prefilledMessage = '') {
-        document.getElementById('quickContactModal').style.display = 'flex';
+        const modal = document.getElementById('quickContactModal');
+        modal.classList.add('active');
+        modal.style.display = 'flex';
         
         // Populate user info
         document.getElementById('quickContactInfo').innerHTML = `
@@ -672,7 +718,9 @@ class FamilyInbox {
     }
     
     closeQuickContactModal() {
-        document.getElementById('quickContactModal').style.display = 'none';
+        const modal = document.getElementById('quickContactModal');
+        modal.classList.remove('active');
+        modal.style.display = 'none';
         document.getElementById('quickContactForm').reset();
         this.quickContactUser = null;
     }

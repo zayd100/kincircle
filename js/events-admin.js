@@ -1,656 +1,351 @@
-// Events Admin Module - Family Coordination Management
-// For family administrators to manage events and tasks across the platform
+// Events Admin Module
+// Unified with other admin modules pattern
 
 class EventsAdmin {
     constructor() {
-        this.events = [];
-        this.currentFilter = 'all';
-        this.currentSort = 'date';
-        this.selectedEvents = new Set();
-        this.currentUser = this.getCurrentUser();
-        
-        this.init();
+        this.pendingEvents = [];
+        this.approvedEvents = [];
+        this.dataLoaded = false;
     }
-    
-    init() {
-        this.loadEvents();
+
+    // Parse a YYYY-MM-DD date string as LOCAL time (not UTC)
+    // This prevents the off-by-one-day bug in western time zones
+    parseLocalDate(dateStr) {
+        if (!dateStr) return new Date();
+        if (dateStr instanceof Date) return dateStr;
+        if (dateStr.includes('T') || dateStr.includes(' ')) {
+            return new Date(dateStr);
+        }
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day);
     }
-    
-    getCurrentUser() {
-        return {
-            id: 1,
-            name: 'Clarke',
-            isAdmin: true
-        };
-    }
-    
-    async loadEvents() {
+
+    async loadData() {
         try {
-            // Try to load from API
-            const response = await fetch('/api/calendar.php?action=getEvents');
-            const data = await response.json();
-            
-            if (data.success) {
-                this.events = data.events.map(event => this.enrichEventData(event));
+            const response = await fetch('/api/calendar.php?action=admin_events');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    this.pendingEvents = Array.isArray(data.pending) ? data.pending : [];
+                    this.approvedEvents = Array.isArray(data.approved) ? data.approved : [];
+                } else {
+                    console.error('Events API error:', data.error);
+                    this.pendingEvents = [];
+                    this.approvedEvents = [];
+                }
             } else {
-                this.events = [];
+                console.log('Events API returned status:', response.status);
+                this.pendingEvents = [];
+                this.approvedEvents = [];
             }
         } catch (error) {
-            console.log('No events data available');
-            this.events = [];
+            console.error('Error loading events:', error);
+            this.pendingEvents = [];
+            this.approvedEvents = [];
         }
     }
-    
-    enrichEventData(event) {
-        return {
-            ...event,
-            attendeeCount: Math.floor(Math.random() * 20) + 5,
-            taskCount: Math.floor(Math.random() * 25) + 3,
-            completedTasks: Math.floor(Math.random() * 15),
-            issues: Math.random() > 0.8 ? ['Duplicate tasks', 'Missing assignments'] : [],
-            lastActivity: this.getRandomRecentDate(),
-            createdBy: {
-                id: Math.floor(Math.random() * 5) + 1,
-                name: ['Sarah', 'Mike', 'Jenny', 'Tom', 'Lisa'][Math.floor(Math.random() * 5)]
-            }
-        };
-    }
-    
-    generateMockEvents() {
+
+    async getStats() {
         return [
-            {
-                id: 1,
-                title: "Annual Family Reunion",
-                event_date: "2025-07-15",
-                event_type: "reunion",
-                description: "Our biggest family gathering of the year",
-                location: "Community Center",
-                attendeeCount: 45,
-                taskCount: 23,
-                completedTasks: 12,
-                issues: ['Missing venue confirmation', 'Task assignments needed'],
-                lastActivity: '2025-01-14T10:30:00Z',
-                createdBy: { id: 1, name: 'Sarah' }
-            },
-            {
-                id: 2,
-                title: "Grandma's 85th Birthday",
-                event_date: "2025-03-20",
-                event_type: "birthday",
-                description: "Special celebration for Grandma",
-                location: "Reed Family Home",
-                attendeeCount: 25,
-                taskCount: 15,
-                completedTasks: 8,
-                issues: [],
-                lastActivity: '2025-01-15T14:20:00Z',
-                createdBy: { id: 2, name: 'Mike' }
-            },
-            {
-                id: 3,
-                title: "Summer BBQ",
-                event_date: "2025-08-20",
-                event_type: "gathering",
-                description: "Casual family get-together",
-                location: "Uncle Mike's Backyard",
-                attendeeCount: 18,
-                taskCount: 8,
-                completedTasks: 2,
-                issues: ['Duplicate task entries'],
-                lastActivity: '2025-01-13T09:15:00Z',
-                createdBy: { id: 3, name: 'Jenny' }
-            }
+            { label: 'Pending Events', value: this.pendingEvents.length }
         ];
     }
-    
-    getRandomRecentDate() {
-        const days = Math.floor(Math.random() * 7) + 1;
-        const date = new Date();
-        date.setDate(date.getDate() - days);
-        return date.toISOString();
-    }
-    
-    render(container) {
+
+    async render(container) {
+        await this.loadData();
+        this.dataLoaded = true;
+
         container.innerHTML = `
-            <div class="events-admin-container">
-                <div class="admin-header">
-                    <h2>🎉 Events Management</h2>
-                    <p>Manage family events, tasks, and coordination</p>
-                </div>
-                
-                <div class="admin-toolbar">
-                    <div class="filter-controls">
-                        <select id="eventFilter" class="admin-select">
-                            <option value="all">All Events</option>
-                            <option value="upcoming">Upcoming Events</option>
-                            <option value="with-issues">Events with Issues</option>
-                            <option value="high-task-count">High Task Count</option>
-                            <option value="recent-activity">Recent Activity</option>
-                        </select>
-                        <select id="eventSort" class="admin-select">
-                            <option value="date">Sort by Date</option>
-                            <option value="activity">Sort by Activity</option>
-                            <option value="tasks">Sort by Task Count</option>
-                            <option value="attendees">Sort by Attendees</option>
-                        </select>
-                    </div>
-                    
-                    <div class="bulk-actions">
-                        <button class="admin-btn secondary" id="selectAllEvents">
-                            📋 Select All
-                        </button>
-                        <button class="admin-btn warning" id="bulkCleanupTasks" disabled>
-                            🧹 Cleanup Selected
-                        </button>
-                        <button class="admin-btn danger" id="bulkDeleteEvents" disabled>
-                            🗑️ Delete Selected
-                        </button>
-                        <button class="admin-btn primary" id="exportEventData">
-                            📊 Export Data
+            <div class="events-admin-panel">
+                <div class="section-header">
+                    <h3>🎉 Events Management</h3>
+                    <div class="header-actions">
+                        <button onclick="eventsAdmin.refresh()" class="btn btn-secondary">
+                            🔄 Refresh
                         </button>
                     </div>
                 </div>
-                
-                <div class="admin-stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">📅</div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="totalEvents">${this.events.length}</div>
-                            <div class="stat-label">Total Events</div>
-                        </div>
+
+                <div class="events-stats" style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="stat-card" style="background: var(--glass-bg); padding: 1rem; border-radius: 8px; text-align: center; min-width: 120px;">
+                        <div class="stat-number" style="font-size: 1.5rem; font-weight: bold; color: var(--primary);">${this.pendingEvents.length}</div>
+                        <div class="stat-label" style="font-size: 0.875rem; color: var(--light-gray);">Pending Review</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">⚠️</div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="eventsWithIssues">${this.events.filter(e => e.issues.length > 0).length}</div>
-                            <div class="stat-label">Events with Issues</div>
-                        </div>
+                    <div class="stat-card" style="background: var(--glass-bg); padding: 1rem; border-radius: 8px; text-align: center; min-width: 120px;">
+                        <div class="stat-number" style="font-size: 1.5rem; font-weight: bold; color: var(--primary);">${this.approvedEvents.length}</div>
+                        <div class="stat-label" style="font-size: 0.875rem; color: var(--light-gray);">Calendar Events</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">📋</div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="totalTasks">${this.events.reduce((sum, e) => sum + e.taskCount, 0)}</div>
-                            <div class="stat-label">Total Tasks</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">✅</div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="completedTasks">${this.events.reduce((sum, e) => sum + e.completedTasks, 0)}</div>
-                            <div class="stat-label">Completed Tasks</div>
-                        </div>
+                    <div class="stat-card" style="background: var(--glass-bg); padding: 1rem; border-radius: 8px; text-align: center; min-width: 120px;">
+                        <div class="stat-number" style="font-size: 1.5rem; font-weight: bold; color: var(--primary);">${this.getUpcomingCount()}</div>
+                        <div class="stat-label" style="font-size: 0.875rem; color: var(--light-gray);">Upcoming</div>
                     </div>
                 </div>
-                
-                <div class="events-admin-list" id="eventsAdminList">
-                    ${this.renderEventsList()}
-                </div>
-                
-                <div class="admin-help-section">
-                    <h3>🆘 Family-Friendly Admin Tips</h3>
-                    <div class="help-grid">
-                        <div class="help-card">
-                            <h4>👴👵 Helping Elderly Family Members</h4>
-                            <ul>
-                                <li>Look for events with many duplicate tasks</li>
-                                <li>Clean up completed tasks to reduce confusion</li>
-                                <li>Use template tasks for common events</li>
-                                <li>Reset assignments if tasks were assigned incorrectly</li>
-                            </ul>
+
+                ${this.pendingEvents.length > 0 ? `
+                    <div class="pending-section" style="margin-bottom: 2rem;">
+                        <h4 style="margin-bottom: 1rem; color: var(--black);">📋 Pending Event Submissions</h4>
+                        <div class="pending-list" id="pendingEventsList">
+                            ${this.renderPendingEvents()}
                         </div>
-                        <div class="help-card">
-                            <h4>🚨 Common Issues to Watch For</h4>
-                            <ul>
-                                <li>Events with 20+ tasks (may be overwhelming)</li>
-                                <li>Duplicate or very similar task names</li>
-                                <li>Tasks assigned to users who can't complete them</li>
-                                <li>Events with no tasks but many attendees</li>
-                            </ul>
-                        </div>
-                        <div class="help-card">
-                            <h4>🛠️ Quick Cleanup Actions</h4>
-                            <ul>
-                                <li>Use "Admin View" in task boards for direct editing</li>
-                                <li>Bulk delete completed tasks after events</li>
-                                <li>Add task templates for standard events</li>
-                                <li>Export data before major cleanups</li>
-                            </ul>
-                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="approved-section">
+                    <h4 style="margin-bottom: 1rem; color: var(--black);">📅 Calendar Events</h4>
+                    <div class="events-list" id="approvedEventsList">
+                        ${this.renderApprovedEvents()}
                     </div>
                 </div>
             </div>
         `;
-        
-        this.setupEventListeners();
     }
-    
-    renderEventsList() {
-        let filteredEvents = [...this.events];
-        
-        // Apply filters
-        switch (this.currentFilter) {
-            case 'upcoming':
-                const now = new Date();
-                filteredEvents = filteredEvents.filter(e => new Date(e.event_date) >= now);
-                break;
-            case 'with-issues':
-                filteredEvents = filteredEvents.filter(e => e.issues.length > 0);
-                break;
-            case 'high-task-count':
-                filteredEvents = filteredEvents.filter(e => e.taskCount > 15);
-                break;
-            case 'recent-activity':
-                const threeDaysAgo = new Date();
-                threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-                filteredEvents = filteredEvents.filter(e => new Date(e.lastActivity) >= threeDaysAgo);
-                break;
-        }
-        
-        // Apply sorting
-        switch (this.currentSort) {
-            case 'date':
-                filteredEvents.sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
-                break;
-            case 'activity':
-                filteredEvents.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
-                break;
-            case 'tasks':
-                filteredEvents.sort((a, b) => b.taskCount - a.taskCount);
-                break;
-            case 'attendees':
-                filteredEvents.sort((a, b) => b.attendeeCount - a.attendeeCount);
-                break;
-        }
-        
-        return filteredEvents.map(event => this.renderEventCard(event)).join('');
+
+    getUpcomingCount() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return this.approvedEvents.filter(e => this.parseLocalDate(e.event_date) >= today).length;
     }
-    
-    renderEventCard(event) {
-        const eventTypeEmojis = {
-            birthday: '🎂',
-            anniversary: '💍',
-            reunion: '👨‍👩‍👧‍👦',
-            holiday: '🎄',
-            gathering: '🎉',
-            other: '📌'
-        };
-        
-        const completionRate = event.taskCount > 0 ? Math.round((event.completedTasks / event.taskCount) * 100) : 0;
-        const hasIssues = event.issues.length > 0;
-        const isSelected = this.selectedEvents.has(event.id);
-        
-        return `
-            <div class="admin-event-card ${hasIssues ? 'has-issues' : ''} ${isSelected ? 'selected' : ''}" 
-                 data-event-id="${event.id}">
-                <div class="event-card-header">
-                    <div class="event-select">
-                        <input type="checkbox" id="event-${event.id}" 
-                               ${isSelected ? 'checked' : ''} 
-                               onchange="eventsAdmin.toggleEventSelection(${event.id})">
-                    </div>
-                    <div class="event-info">
-                        <h3 class="event-title">
-                            ${eventTypeEmojis[event.event_type] || '📌'} ${event.title}
-                        </h3>
-                        <div class="event-meta">
-                            <span class="event-date">${this.formatDate(event.event_date)}</span>
-                            <span class="event-location">${event.location}</span>
-                            <span class="event-creator">Created by ${event.createdBy.name}</span>
+
+    renderPendingEvents() {
+        if (this.pendingEvents.length === 0) {
+            return `<p style="color: var(--light-gray); text-align: center; padding: 1rem;">No pending events to review.</p>`;
+        }
+
+        return this.pendingEvents.map(event => {
+            const eventDate = event.event_date ? this.parseLocalDate(event.event_date).toLocaleDateString() : 'No date';
+            const submittedDate = event.submitted_at ? new Date(event.submitted_at).toLocaleDateString() : '';
+
+            return `
+                <div class="event-card pending" data-id="${event.id}" style="background: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                        <div class="event-info" style="flex: 1; min-width: 200px;">
+                            <h4 style="margin: 0 0 0.5rem 0; color: var(--black);">
+                                <span style="background: #f59e0b; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-right: 0.5rem;">PENDING</span>
+                                ${this.escapeHtml(event.title)}
+                            </h4>
+                            <div style="font-size: 0.875rem; color: var(--light-gray);">
+                                <span>📅 ${eventDate}</span>
+                                ${event.submitted_by_name ? `<span style="margin-left: 1rem;">👤 Submitted by ${this.escapeHtml(event.submitted_by_name)}</span>` : ''}
+                                ${submittedDate ? `<span style="margin-left: 1rem;">🕐 ${submittedDate}</span>` : ''}
+                            </div>
+                            ${event.description ? `<p style="margin: 0.5rem 0 0 0; color: var(--light-gray); font-size: 0.875rem;">${this.escapeHtml(event.description)}</p>` : ''}
+                        </div>
+                        <div class="event-actions" style="display: flex; gap: 0.5rem;">
+                            <button onclick="eventsAdmin.approveEvent(${event.id}, '${this.escapeHtml(event.title).replace(/'/g, "\\'")}')" class="btn btn-primary btn-sm">
+                                ✅ Approve
+                            </button>
+                            <button onclick="eventsAdmin.rejectEvent(${event.id}, '${this.escapeHtml(event.title).replace(/'/g, "\\'")}')" class="btn btn-danger btn-sm">
+                                ❌ Reject
+                            </button>
                         </div>
                     </div>
-                    <div class="event-actions">
-                        <button class="admin-btn small" onclick="eventsAdmin.openEventDetails(${event.id})">
-                            👁️ View
-                        </button>
-                        <button class="admin-btn small warning" onclick="eventsAdmin.cleanupEvent(${event.id})">
-                            🧹 Cleanup
-                        </button>
-                        <button class="admin-btn small danger" onclick="eventsAdmin.deleteEvent(${event.id})">
-                            🗑️ Delete
-                        </button>
-                    </div>
                 </div>
-                
-                <div class="event-stats">
-                    <div class="stat">
-                        <span class="stat-value">${event.attendeeCount}</span>
-                        <span class="stat-label">Attendees</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">${event.taskCount}</span>
-                        <span class="stat-label">Tasks</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">${completionRate}%</span>
-                        <span class="stat-label">Complete</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">${this.getTimeAgo(event.lastActivity)}</span>
-                        <span class="stat-label">Last Activity</span>
-                    </div>
+            `;
+        }).join('');
+    }
+
+    renderApprovedEvents() {
+        if (this.approvedEvents.length === 0) {
+            return `
+                <div class="empty-state" style="text-align: center; padding: 2rem; color: var(--light-gray);">
+                    <p>📅 No events on the calendar yet.</p>
                 </div>
-                
-                ${hasIssues ? `
-                    <div class="event-issues">
-                        <h4>⚠️ Issues Detected:</h4>
-                        <ul>
-                            ${event.issues.map(issue => `<li>${issue}</li>`).join('')}
-                        </ul>
-                    </div>
-                ` : ''}
-                
-                ${event.description ? `
-                    <div class="event-description">
-                        <p>${event.description}</p>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    }
-    
-    formatDate(dateStr) {
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    }
-    
-    getTimeAgo(dateStr) {
-        const now = new Date();
-        const date = new Date(dateStr);
-        const diffHours = Math.floor((now - date) / (1000 * 60 * 60));
-        
-        if (diffHours < 1) return 'Now';
-        if (diffHours < 24) return `${diffHours}h ago`;
-        
-        const diffDays = Math.floor(diffHours / 24);
-        if (diffDays < 7) return `${diffDays}d ago`;
-        
-        return `${Math.floor(diffDays / 7)}w ago`;
-    }
-    
-    setupEventListeners() {
-        // Filter and sort controls
-        document.getElementById('eventFilter').addEventListener('change', (e) => {
-            this.currentFilter = e.target.value;
-            this.refreshEventsList();
-        });
-        
-        document.getElementById('eventSort').addEventListener('change', (e) => {
-            this.currentSort = e.target.value;
-            this.refreshEventsList();
-        });
-        
-        // Bulk actions
-        document.getElementById('selectAllEvents').addEventListener('click', () => {
-            this.toggleSelectAll();
-        });
-        
-        document.getElementById('bulkCleanupTasks').addEventListener('click', () => {
-            this.bulkCleanupSelectedEvents();
-        });
-        
-        document.getElementById('bulkDeleteEvents').addEventListener('click', () => {
-            this.bulkDeleteSelectedEvents();
-        });
-        
-        document.getElementById('exportEventData').addEventListener('click', () => {
-            this.exportEventData();
-        });
-    }
-    
-    refreshEventsList() {
-        const container = document.getElementById('eventsAdminList');
-        container.innerHTML = this.renderEventsList();
-    }
-    
-    toggleEventSelection(eventId) {
-        if (this.selectedEvents.has(eventId)) {
-            this.selectedEvents.delete(eventId);
-        } else {
-            this.selectedEvents.add(eventId);
+            `;
         }
-        
-        this.updateBulkActionButtons();
-        this.updateEventCardSelection(eventId);
-    }
-    
-    updateEventCardSelection(eventId) {
-        const card = document.querySelector(`[data-event-id="${eventId}"]`);
-        if (card) {
-            card.classList.toggle('selected', this.selectedEvents.has(eventId));
-        }
-    }
-    
-    updateBulkActionButtons() {
-        const hasSelected = this.selectedEvents.size > 0;
-        document.getElementById('bulkCleanupTasks').disabled = !hasSelected;
-        document.getElementById('bulkDeleteEvents').disabled = !hasSelected;
-        
-        const selectAllBtn = document.getElementById('selectAllEvents');
-        selectAllBtn.textContent = this.selectedEvents.size === this.events.length ? '❌ Deselect All' : '📋 Select All';
-    }
-    
-    toggleSelectAll() {
-        if (this.selectedEvents.size === this.events.length) {
-            this.selectedEvents.clear();
-        } else {
-            this.events.forEach(event => this.selectedEvents.add(event.id));
-        }
-        
-        // Update checkboxes
-        document.querySelectorAll('.event-select input[type="checkbox"]').forEach(checkbox => {
-            const eventId = parseInt(checkbox.id.replace('event-', ''));
-            checkbox.checked = this.selectedEvents.has(eventId);
-        });
-        
-        // Update card selections
-        this.selectedEvents.forEach(eventId => this.updateEventCardSelection(eventId));
-        
-        this.updateBulkActionButtons();
-    }
-    
-    openEventDetails(eventId) {
-        // This would open the full event management modal
-        // For now, show a notification
-        this.showNotification(`Opening detailed view for event ${eventId}...`, 'info');
-        
-        // In production, this could open the same modal as the main events page
-        // or navigate to a dedicated admin event page
-    }
-    
-    cleanupEvent(eventId) {
-        const event = this.events.find(e => e.id === eventId);
-        if (!event) return;
-        
-        if (confirm(`Clean up tasks for "${event.title}"? This will remove completed tasks and organize remaining ones.`)) {
-            // Simulate cleanup
-            event.completedTasks = 0;
-            event.taskCount = Math.max(3, event.taskCount - event.completedTasks);
-            event.issues = event.issues.filter(issue => !issue.includes('Duplicate'));
-            event.lastActivity = new Date().toISOString();
-            
-            this.refreshEventsList();
-            this.showNotification(`Cleaned up tasks for "${event.title}"`, 'success');
-        }
-    }
-    
-    bulkCleanupSelectedEvents() {
-        if (this.selectedEvents.size === 0) return;
-        
-        if (confirm(`Clean up tasks for ${this.selectedEvents.size} selected events? This will remove completed tasks and organize remaining ones.`)) {
-            let cleanedCount = 0;
-            
-            this.selectedEvents.forEach(eventId => {
-                const event = this.events.find(e => e.id === eventId);
-                if (event) {
-                    event.completedTasks = 0;
-                    event.taskCount = Math.max(3, event.taskCount - event.completedTasks);
-                    event.issues = event.issues.filter(issue => !issue.includes('Duplicate'));
-                    event.lastActivity = new Date().toISOString();
-                    cleanedCount++;
-                }
+
+        // Sort by date, upcoming first
+        const sorted = [...this.approvedEvents].sort((a, b) =>
+            this.parseLocalDate(a.event_date) - this.parseLocalDate(b.event_date)
+        );
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return sorted.map(event => {
+            const eventDate = this.parseLocalDate(event.event_date);
+            const dateStr = eventDate.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
             });
-            
-            this.selectedEvents.clear();
-            this.refreshEventsList();
-            this.updateBulkActionButtons();
-            this.showNotification(`Cleaned up ${cleanedCount} events successfully`, 'success');
+            const isPast = eventDate < today;
+            const isToday = eventDate.toDateString() === today.toDateString();
+
+            return `
+                <div class="event-card" data-id="${event.id}" style="background: var(--glass-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; ${isPast ? 'opacity: 0.6;' : ''}">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <div class="event-info" style="flex: 1; min-width: 200px;">
+                            <h4 style="margin: 0 0 0.25rem 0; color: var(--black);">
+                                ${isToday ? '<span style="background: var(--primary); color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-right: 0.5rem;">TODAY</span>' : ''}
+                                ${isPast ? '<span style="background: var(--light-gray); color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-right: 0.5rem;">PAST</span>' : ''}
+                                ${this.escapeHtml(event.title)}
+                            </h4>
+                            <div style="font-size: 0.875rem; color: var(--light-gray);">
+                                <span>📅 ${dateStr}</span>
+                                ${event.created_by_name ? `<span style="margin-left: 1rem;">👤 ${this.escapeHtml(event.created_by_name)}</span>` : ''}
+                            </div>
+                            ${event.description ? `<p style="margin: 0.5rem 0 0 0; color: var(--light-gray); font-size: 0.875rem;">${this.escapeHtml(event.description)}</p>` : ''}
+                        </div>
+                        <div class="event-actions">
+                            <button onclick="eventsAdmin.deleteEvent(${event.id}, '${this.escapeHtml(event.title).replace(/'/g, "\\'")}')" class="btn btn-danger btn-sm" title="Delete">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async refresh() {
+        await this.loadData();
+        const container = document.getElementById('moduleContent');
+        if (container) {
+            await this.render(container);
+        }
+        this.showMessage('Events refreshed', 'success');
+    }
+
+    async approveEvent(eventId, eventTitle) {
+        if (!confirm(`Approve "${eventTitle}" and add to the calendar?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/approve-event.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event_id: eventId })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Remove from pending, will appear in approved on refresh
+                this.pendingEvents = this.pendingEvents.filter(e => e.id != eventId);
+                await this.refresh();
+                this.showMessage(`"${eventTitle}" approved and added to calendar`, 'success');
+            } else {
+                throw new Error(result.error || 'Approval failed');
+            }
+        } catch (error) {
+            console.error('Approve error:', error);
+            this.showMessage('Failed to approve event: ' + error.message, 'error');
         }
     }
-    
-    exportEventData() {
-        const data = {
-            exportDate: new Date().toISOString(),
-            totalEvents: this.events.length,
-            events: this.events.map(event => ({
-                ...event,
-                completionRate: event.taskCount > 0 ? Math.round((event.completedTasks / event.taskCount) * 100) : 0
-            }))
+
+    async rejectEvent(eventId, eventTitle) {
+        const reason = prompt(`Reason for rejecting "${eventTitle}" (optional):`);
+        if (reason === null) return; // User cancelled
+
+        try {
+            const response = await fetch('/api/reject-event.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event_id: eventId, reason: reason })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.pendingEvents = this.pendingEvents.filter(e => e.id != eventId);
+                await this.refresh();
+                this.showMessage(`"${eventTitle}" rejected`, 'success');
+            } else {
+                throw new Error(result.error || 'Rejection failed');
+            }
+        } catch (error) {
+            console.error('Reject error:', error);
+            this.showMessage('Failed to reject event: ' + error.message, 'error');
+        }
+    }
+
+    async deleteEvent(eventId, eventTitle) {
+        if (!confirm(`Delete "${eventTitle}" from the calendar?\n\nThis cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/calendar.php?action=delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event_id: eventId })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.approvedEvents = this.approvedEvents.filter(e => e.id != eventId);
+                await this.refresh();
+                this.showMessage(`"${eventTitle}" deleted`, 'success');
+            } else {
+                throw new Error(result.error || 'Delete failed');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            this.showMessage('Failed to delete event: ' + error.message, 'error');
+        }
+    }
+
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    showMessage(text, type = 'info') {
+        const colors = {
+            success: { bg: '#f0fdf4', text: '#166534' },
+            error: { bg: '#fef2f2', text: '#991b1b' },
+            info: { bg: '#f0f9ff', text: '#1e40af' },
+            warning: { bg: '#fffbeb', text: '#92400e' }
         };
-        
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `family-events-export-${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        
-        this.showNotification('Event data exported successfully', 'success');
-    }
-    
-    async deleteEvent(eventId) {
-        const event = this.events.find(e => e.id === eventId);
-        if (!event) return;
-        
-        if (confirm(`Are you sure you want to delete the event "${event.title}"? This action cannot be undone.`)) {
-            try {
-                // Try to delete from backend
-                const response = await fetch('/api/calendar.php?action=delete', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ event_id: eventId })
-                });
-                
-                if (!response.ok) {
-                    console.log('API delete not available, removing from local list');
-                }
-                
-                // Remove from local list
-                this.events = this.events.filter(e => e.id !== eventId);
-                this.selectedEvents.delete(eventId);
-                
-                this.refreshEventsList();
-                this.updateBulkActionButtons();
-                this.showNotification(`Event "${event.title}" has been deleted`, 'success');
-                
-            } catch (error) {
-                console.error('Error deleting event:', error);
-                // Still remove from local list for UI consistency
-                this.events = this.events.filter(e => e.id !== eventId);
-                this.selectedEvents.delete(eventId);
-                this.refreshEventsList();
-                this.showNotification(`Event removed from display (API pending)`, 'warning');
-            }
-        }
-    }
-    
-    async bulkDeleteSelectedEvents() {
-        if (this.selectedEvents.size === 0) return;
-        
-        const eventCount = this.selectedEvents.size;
-        const eventWord = eventCount === 1 ? 'event' : 'events';
-        
-        if (confirm(`Are you sure you want to delete ${eventCount} selected ${eventWord}? This action cannot be undone.`)) {
-            const deletedEvents = [];
-            
-            for (const eventId of this.selectedEvents) {
-                const event = this.events.find(e => e.id === eventId);
-                if (event) {
-                    deletedEvents.push(event.title);
-                    
-                    try {
-                        // Try to delete from backend
-                        const response = await fetch('/api/calendar.php?action=delete', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ event_id: eventId })
-                        });
-                        
-                        if (!response.ok) {
-                            console.log(`API delete not available for event ${eventId}`);
-                        }
-                    } catch (error) {
-                        console.error(`Error deleting event ${eventId}:`, error);
-                    }
-                }
-            }
-            
-            // Remove from local list
-            this.events = this.events.filter(e => !this.selectedEvents.has(e.id));
-            this.selectedEvents.clear();
-            
-            this.refreshEventsList();
-            this.updateBulkActionButtons();
-            this.showNotification(`Deleted ${deletedEvents.length} ${eventWord}`, 'success');
-        }
-    }
-    
-    showNotification(message, type = 'info') {
-        // Simple notification system
-        const notification = document.createElement('div');
-        notification.className = `admin-notification ${type}`;
-        notification.textContent = message;
-        notification.style.cssText = `
+        const color = colors[type] || colors.info;
+
+        const msg = document.createElement('div');
+        msg.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--glass-bg);
-            backdrop-filter: var(--glass-backdrop);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-md) var(--spacing-lg);
-            color: var(--text-primary);
+            top: 2rem;
+            right: 2rem;
+            background: ${color.bg};
+            color: ${color.text};
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             z-index: 10000;
-            max-width: 300px;
+            animation: slideIn 0.3s ease;
+            font-weight: 500;
         `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            if (notification.parentNode) {
-                document.body.removeChild(notification);
-            }
-        }, 3000);
-    }
-    
-    getStats() {
-        return {
-            total: this.events.length,
-            withIssues: this.events.filter(e => e.issues.length > 0).length,
-            totalTasks: this.events.reduce((sum, e) => sum + e.taskCount, 0),
-            completedTasks: this.events.reduce((sum, e) => sum + e.completedTasks, 0)
-        };
+        msg.textContent = text;
+        document.body.appendChild(msg);
+
+        setTimeout(() => msg.remove(), 4000);
     }
 }
 
-// Initialize the events admin module
-window.eventsAdmin = new EventsAdmin();
+// Create instance
+const eventsAdmin = new EventsAdmin();
 
-// Register with admin core if available
+// Register with admin core
+function registerEventsModule() {
+    if (window.adminCore) {
+        adminCore.registerModule({
+            name: 'events',
+            title: 'Events Management',
+            icon: '🎉',
+            priority: 5,
+            getStats: () => eventsAdmin.getStats(),
+            render: (container) => eventsAdmin.render(container)
+        });
+    }
+}
+
 if (window.adminCore) {
-    adminCore.registerModule({
-        name: 'events',
-        title: 'Events Management',
-        icon: '🎉',
-        priority: 2,
-        getStats: () => eventsAdmin.getStats(),
-        render: (container) => eventsAdmin.render(container)
+    registerEventsModule();
+} else {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(registerEventsModule, 200);
     });
 }

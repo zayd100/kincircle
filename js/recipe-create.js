@@ -308,49 +308,56 @@ class RecipeCreator {
     }
     
     async createRecipe(recipeData) {
-        // Simulate API call with progress updates
+        // Show progress updates
         this.updateProgress(10, 'Validating recipe data...');
-        await this.delay(500);
-        
+        await this.delay(300);
+
         this.updateProgress(30, 'Saving ingredients...');
-        await this.delay(500);
-        
+        await this.delay(300);
+
         this.updateProgress(50, 'Processing instructions...');
-        await this.delay(500);
-        
+        await this.delay(300);
+
         this.updateProgress(70, 'Adding to recipe vault...');
-        await this.delay(500);
-        
-        this.updateProgress(90, 'Finalizing recipe...');
-        await this.delay(500);
-        
-        // In production, this would be a real API call
+
+        // Build API payload with correct field names (snake_case for PHP)
+        const apiPayload = {
+            name: recipeData.name,
+            category: recipeData.category,
+            difficulty: recipeData.difficulty,
+            serves: recipeData.serves,
+            prep_time: recipeData.prepTime,
+            cook_time: recipeData.cookTime,
+            ingredients: recipeData.ingredients.join('\n'),
+            instructions: recipeData.instructions.join('\n'),
+            story: recipeData.story,
+            source: recipeData.source,
+            occasion: recipeData.occasion
+        };
+
         try {
-            const response = await fetch('/api/recipes.php', {
+            const response = await fetch('/api/recipes.php?action=add', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    action: 'create',
-                    recipe: recipeData
-                })
+                body: JSON.stringify(apiPayload)
             });
-            
-            if (!response.ok) {
-                throw new Error('Failed to create recipe');
-            }
-            
+
             const result = await response.json();
-            this.createdRecipeId = result.id;
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Failed to create recipe');
+            }
+
+            this.createdRecipeId = result.recipe_id;
+            this.updateProgress(100, 'Recipe created successfully!');
+            await this.delay(300);
+
         } catch (error) {
-            // For staging, simulate success
-            this.createdRecipeId = Date.now();
-            console.log('Recipe created in staging mode:', recipeData);
+            console.error('Recipe creation error:', error);
+            throw error;
         }
-        
-        this.updateProgress(100, 'Recipe created successfully!');
-        await this.delay(500);
     }
     
     showCreationProgress() {

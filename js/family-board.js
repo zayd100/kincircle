@@ -485,39 +485,43 @@ class FamilyMessageBoard {
     
     async handleNewThread(e) {
         e.preventDefault();
-        
+
         const formData = {
             title: document.getElementById('threadTitle').value,
-            category: document.getElementById('threadCategory').value,
+            category: this.selectedCategory,  // Fixed: use tracked category instead of non-existent element
             content: document.getElementById('threadContent').value,
             isPinned: document.getElementById('threadPinned').checked && this.currentUser.isAdmin
         };
-        
+
         try {
-            // Send to API
+            // Send to API with all fields
             const response = await fetch('/api/messages.php?action=add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     subject: formData.title,
-                    content: formData.content
+                    content: formData.content,
+                    category: formData.category,
+                    is_pinned: formData.isPinned ? 1 : 0
                 })
             });
             
             const result = await response.json();
-            
+
             if (result.success) {
                 // Reload threads to get the latest data
                 await this.loadThreads();
                 this.closeNewThreadModal();
                 this.showNotification('Conversation posted successfully!', 'success');
             } else {
-                throw new Error(result.message || 'Failed to create thread');
+                console.error('API error response:', result);
+                throw new Error(result.error || result.message || 'Failed to create thread');
             }
-            
+
         } catch (error) {
             console.error('Error creating thread:', error);
-            this.showNotification('Failed to post conversation', 'error');
+            console.error('Full error details:', error.message);
+            this.showNotification('Failed to post conversation: ' + error.message, 'error');
         }
     }
     

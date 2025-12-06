@@ -1,339 +1,693 @@
--- Reed & Weaver Family Database Setup
--- Run this SQL to create the database and tables
+-- Kin Circle Database Setup
+-- Private Family Social Network
+--
+-- Instructions:
+-- 1. Create a database for your installation
+-- 2. Update config.php with your database credentials
+-- 3. Run this script: mysql -u username -p database_name < setup_database.sql
 
-CREATE DATABASE IF NOT EXISTS reedweaver_family;
-USE reedweaver_family;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
 
--- Users table
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    display_name VARCHAR(100) NOT NULL,
-    email VARCHAR(100),
-    phone VARCHAR(20),
-    birthday DATE NULL,
-    is_admin TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP NULL,
-    cousin_connect_available TINYINT(1) DEFAULT 0,
-    cousin_connect_interests TEXT,
-    cousin_connect_since TIMESTAMP NULL,
-    -- Three-field password system: stores "name|beverage|number" as hashed password
-    -- This revolutionary approach makes login memorable while maintaining security
-    password_type ENUM('traditional', 'three_field') DEFAULT 'three_field'
-);
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
 
--- Recipes table
-CREATE TABLE recipes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(200) NOT NULL,
-    category VARCHAR(50),
-    difficulty VARCHAR(20),
-    serves INT,
-    prep_time VARCHAR(100),
-    cook_time VARCHAR(100),
-    ingredients TEXT NOT NULL,
-    instructions TEXT NOT NULL,
-    story TEXT,
-    source VARCHAR(200),
-    occasion VARCHAR(200),
-    created_by INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active TINYINT(1) DEFAULT 1,
-    FOREIGN KEY (created_by) REFERENCES users(id)
-);
+-- --------------------------------------------------------
 
--- Recipe modifications/notes
-CREATE TABLE recipe_modifications (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    recipe_id INT NOT NULL,
-    modified_by INT NOT NULL,
-    modification_text TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (recipe_id) REFERENCES recipes(id),
-    FOREIGN KEY (modified_by) REFERENCES users(id)
-);
+--
+-- Table structure for table `admin_messages`
+--
 
--- Messages/Board posts
-CREATE TABLE messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    subject VARCHAR(200) NOT NULL,
-    content TEXT NOT NULL,
-    posted_by INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active TINYINT(1) DEFAULT 1,
-    FOREIGN KEY (posted_by) REFERENCES users(id)
-);
+CREATE TABLE `admin_messages` (
+  `id` int(11) NOT NULL,
+  `message_type` enum('password_help','general','bug_report','feature_request') DEFAULT 'general',
+  `username` varchar(50) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `subject` varchar(200) NOT NULL,
+  `message` text NOT NULL,
+  `status` enum('unread','read','resolved') DEFAULT 'unread',
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `resolved_at` timestamp NULL DEFAULT NULL,
+  `resolved_by` int(11) DEFAULT NULL,
+  `admin_notes` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Message replies
-CREATE TABLE message_replies (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    message_id INT NOT NULL,
-    content TEXT NOT NULL,
-    posted_by INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (message_id) REFERENCES messages(id),
-    FOREIGN KEY (posted_by) REFERENCES users(id)
-);
+-- --------------------------------------------------------
 
--- Calendar events (approved events that appear on calendar)
-CREATE TABLE calendar_events (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    event_date DATE NOT NULL,
-    description TEXT,
-    created_by INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES users(id)
-);
+--
+-- Table structure for table `albums`
+--
 
--- Event submissions table for moderation workflow
-CREATE TABLE event_submissions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    event_date DATE NOT NULL,
-    description TEXT,
-    submitter_id INT NOT NULL,
-    event_type ENUM('birthday', 'anniversary', 'reunion', 'holiday', 'gathering', 'other') DEFAULT 'other',
-    recurring ENUM('none', 'yearly', 'monthly') DEFAULT 'none',
-    contact_info VARCHAR(200), -- For event coordination
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    reviewed_by INT NULL,
-    reviewed_at TIMESTAMP NULL,
-    reviewer_notes TEXT,
-    approved_event_id INT NULL, -- Reference to calendar_events.id when approved
-    FOREIGN KEY (submitter_id) REFERENCES users(id),
-    FOREIGN KEY (reviewed_by) REFERENCES users(id),
-    FOREIGN KEY (approved_event_id) REFERENCES calendar_events(id)
-);
+CREATE TABLE `albums` (
+  `id` int(11) NOT NULL,
+  `folder_name` varchar(100) NOT NULL,
+  `display_name` varchar(200) NOT NULL,
+  `emoji` varchar(10) DEFAULT '?',
+  `description` text DEFAULT NULL,
+  `date_range` varchar(50) DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `is_active` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Pending user registrations table
-CREATE TABLE pending_users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    display_name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) NOT NULL,
-    phone VARCHAR(20),
-    birthday DATE NULL,
-    family_connection ENUM('reed', 'weaver', 'married-in', 'other') NOT NULL,
-    relationship_note TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    reviewed_at TIMESTAMP NULL,
-    reviewed_by INT NULL,
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    admin_notes TEXT,
-    password_type ENUM('traditional', 'three_field') DEFAULT 'three_field',
-    FOREIGN KEY (reviewed_by) REFERENCES users(id)
-);
+-- --------------------------------------------------------
 
--- Admin messages table for password help and other admin communications
-CREATE TABLE admin_messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    message_type ENUM('password_help', 'general', 'bug_report', 'feature_request') DEFAULT 'general',
-    username VARCHAR(50),
-    email VARCHAR(100),
-    subject VARCHAR(200) NOT NULL,
-    message TEXT NOT NULL,
-    status ENUM('unread', 'read', 'resolved') DEFAULT 'unread',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    resolved_at TIMESTAMP NULL,
-    resolved_by INT NULL,
-    admin_notes TEXT,
-    FOREIGN KEY (resolved_by) REFERENCES users(id)
-);
+--
+-- Table structure for table `calendar_events`
+--
 
--- Photo submissions table for upload moderation system
-CREATE TABLE photo_submissions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    filename VARCHAR(255) NOT NULL,
-    original_name VARCHAR(255) NOT NULL,
-    file_size INT,
-    mime_type VARCHAR(100),
-    file_type VARCHAR(100),
-    uploader_id INT NOT NULL,
-    event_name VARCHAR(200),
-    date_taken VARCHAR(100),
-    people_in_photo TEXT,
-    description TEXT,
-    photo_title VARCHAR(200),
-    photo_description TEXT,
-    location_name VARCHAR(200),
-    location_city VARCHAR(100),
-    location_state VARCHAR(50),
-    suggested_album VARCHAR(100),
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    reviewed_by INT NULL,
-    reviewed_at TIMESTAMP NULL,
-    reviewer_notes TEXT,
-    final_album VARCHAR(100) NULL,
-    FOREIGN KEY (uploader_id) REFERENCES users(id),
-    FOREIGN KEY (reviewed_by) REFERENCES users(id),
-    INDEX idx_location_city (location_city),
-    INDEX idx_date_taken (date_taken)
-);
+CREATE TABLE `calendar_events` (
+  `id` int(11) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `event_date` date NOT NULL,
+  `description` text DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Albums metadata table
-CREATE TABLE albums (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    folder_name VARCHAR(100) UNIQUE NOT NULL,
-    display_name VARCHAR(200) NOT NULL,
-    emoji VARCHAR(10) DEFAULT '📸',
-    description TEXT,
-    date_range VARCHAR(50),
-    created_by INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active TINYINT(1) DEFAULT 1,
-    FOREIGN KEY (created_by) REFERENCES users(id)
-);
+-- --------------------------------------------------------
 
--- Event commitments table - tracks user attendance commitments for events
-CREATE TABLE event_commitments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    event_id INT NOT NULL,
-    user_id INT NOT NULL,
-    committed TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_commitment (event_id, user_id)
-);
+--
+-- Table structure for table `content_tags`
+--
 
--- People table - stores unique people that can be tagged in content
-CREATE TABLE people (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    normalized_name VARCHAR(100) NOT NULL,
-    display_name VARCHAR(100) NOT NULL,
-    created_by_user_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_normalized_name (normalized_name),
-    INDEX idx_display_name (display_name)
-);
+CREATE TABLE `content_tags` (
+  `id` int(11) NOT NULL,
+  `person_id` int(11) NOT NULL,
+  `content_type` enum('photo','media','document','post') NOT NULL,
+  `content_id` int(11) NOT NULL,
+  `tagged_by_user_id` int(11) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Content tags table - universal tagging system for photos, media, etc.
-CREATE TABLE content_tags (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    person_id INT NOT NULL,
-    content_type ENUM('photo', 'media') NOT NULL,
-    content_id INT NOT NULL,
-    tagged_by_user_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
-    FOREIGN KEY (tagged_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_tag (person_id, content_type, content_id),
-    INDEX idx_person_id (person_id),
-    INDEX idx_content (content_type, content_id)
-);
+-- --------------------------------------------------------
 
--- Photo tags table (LEGACY - kept for backward compatibility)
--- New code should use content_tags instead
-CREATE TABLE photo_tags (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    photo_id INT NOT NULL,
-    person_name VARCHAR(100) NOT NULL,
-    tagged_by_user_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (photo_id) REFERENCES photo_submissions(id) ON DELETE CASCADE,
-    FOREIGN KEY (tagged_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_photo_id (photo_id),
-    INDEX idx_person_name (person_name)
-);
+--
+-- Table structure for table `event_commitments`
+--
 
--- Private messages table - user-to-user direct messaging
-CREATE TABLE private_messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sender_id INT NOT NULL,
-    recipient_id INT NOT NULL,
-    subject VARCHAR(200),
-    content TEXT NOT NULL,
-    is_important TINYINT(1) DEFAULT 0,
-    is_read TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_sender (sender_id),
-    INDEX idx_recipient (recipient_id),
-    INDEX idx_conversation (sender_id, recipient_id),
-    INDEX idx_created_at (created_at),
-    INDEX idx_is_read (is_read)
-);
+CREATE TABLE `event_commitments` (
+  `id` int(11) NOT NULL,
+  `event_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `committed` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Memorial submissions table for moderation workflow
-CREATE TABLE memorial_submissions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(200) NOT NULL,
-    birth_date VARCHAR(100),
-    death_date VARCHAR(100),
-    memorial_text TEXT NOT NULL,
-    photo_filename VARCHAR(255),
-    submitted_by INT NOT NULL,
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    reviewed_by INT NULL,
-    reviewed_at TIMESTAMP NULL,
-    reviewer_notes TEXT,
-    approved_memorial_id INT NULL,
-    FOREIGN KEY (submitted_by) REFERENCES users(id),
-    FOREIGN KEY (reviewed_by) REFERENCES users(id)
-);
+-- --------------------------------------------------------
 
--- Approved memorials table
-CREATE TABLE memorials (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(200) NOT NULL,
-    birth_date VARCHAR(100),
-    death_date VARCHAR(100),
-    memorial_text TEXT NOT NULL,
-    photo_filename VARCHAR(255),
-    created_by INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active TINYINT(1) DEFAULT 1,
-    FOREIGN KEY (created_by) REFERENCES users(id)
-);
+--
+-- Table structure for table `event_submissions`
+--
 
--- Create default admin user (password: admin123 - CHANGE THIS!)
-INSERT INTO users (username, password_hash, display_name, email, is_admin) VALUES 
-('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Clarke', 'cc@zyzd.cc', 1);
+CREATE TABLE `event_submissions` (
+  `id` int(11) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `event_date` date NOT NULL,
+  `description` text DEFAULT NULL,
+  `submitter_id` int(11) NOT NULL,
+  `event_type` enum('birthday','anniversary','reunion','holiday','gathering','other') DEFAULT 'other',
+  `recurring` enum('none','yearly','monthly') DEFAULT 'none',
+  `contact_info` varchar(200) DEFAULT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `submitted_at` timestamp NULL DEFAULT current_timestamp(),
+  `reviewed_by` int(11) DEFAULT NULL,
+  `reviewed_at` timestamp NULL DEFAULT NULL,
+  `reviewer_notes` text DEFAULT NULL,
+  `approved_event_id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Create sample test users (all passwords: family123)
-INSERT INTO users (username, password_hash, display_name, email) VALUES 
-('user1', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Test User 1', 'user1@example.com'),
-('user2', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Test User 2', 'user2@example.com'),
-('user3', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Test User 3', 'user3@example.com');
+-- --------------------------------------------------------
 
--- Sample recipe
-INSERT INTO recipes (name, ingredients, instructions, created_by) VALUES 
-('Sample Recipe', 
-'Ingredient 1\nIngredient 2\nIngredient 3\nIngredient 4',
-'Step 1: Do something\nStep 2: Do something else\nStep 3: Complete the recipe',
-2);
+--
+-- Table structure for table `family_connection_cache`
+--
 
--- Sample recipe modification
-INSERT INTO recipe_modifications (recipe_id, modified_by, modification_text) VALUES 
-(1, 3, 'Test modification note');
+CREATE TABLE `family_connection_cache` (
+  `id` int(11) NOT NULL,
+  `cache_key` varchar(255) NOT NULL,
+  `graph_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`graph_data`)),
+  `person_count` int(11) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `expires_at` timestamp NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Sample message
-INSERT INTO messages (subject, content, posted_by) VALUES 
-('Test Message Subject', 'Sample message content for testing purposes.', 2);
+-- --------------------------------------------------------
 
--- Sample calendar events
-INSERT INTO calendar_events (title, event_date, created_by) VALUES 
-('Sample Event 1', '2025-01-15', 1),
-('Sample Event 2', '2025-01-28', 1),
-('Sample Event 3', '2025-07-15', 1),
-('Sample Event 4', '2025-12-25', 1);
+--
+-- Table structure for table `family_inferences`
+--
 
--- Insert existing albums into database
-INSERT INTO albums (folder_name, display_name, emoji, description, date_range, created_by) VALUES
-('BBQ', 'BBQ Album', '🔥', 'Sample BBQ album', 'Summer 2024', 1),
-('Birthday', 'Birthday Album', '🎂', 'Sample birthday album', 'January 2024', 1),
-('GameNight', 'Game Night Album', '🎮', 'Sample game night album', 'December 2023', 1),
-('Christmas', 'Christmas Album', '🎄', 'Sample holiday album', 'December 2023', 1),
-('Picnic', 'Picnic Album', '🌸', 'Sample picnic album', 'Spring 2024', 1),
-('Anniversary', 'Anniversary Album', '💍', 'Sample anniversary album', 'June 2024', 1);
+CREATE TABLE `family_inferences` (
+  `id` int(11) NOT NULL,
+  `person_user_id` int(11) NOT NULL,
+  `related_user_id` int(11) NOT NULL,
+  `relationship` varchar(50) NOT NULL,
+  `inference_path` text NOT NULL,
+  `confidence` decimal(3,2) DEFAULT 1.00,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `family_relationships`
+--
+
+CREATE TABLE `family_relationships` (
+  `id` int(11) NOT NULL,
+  `claimer_user_id` int(11) NOT NULL,
+  `claimed_user_id` int(11) NOT NULL,
+  `relationship` enum('parent','child','sibling','spouse') NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `active` tinyint(1) DEFAULT 1,
+  `revoked_at` timestamp NULL DEFAULT NULL,
+  `revoked_by` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+--
+-- Triggers `family_relationships`
+--
+DELIMITER $$
+CREATE TRIGGER `update_family_inferences_on_relationship_change` AFTER INSERT ON `family_relationships` FOR EACH ROW BEGIN
+    DELETE FROM family_inferences
+    WHERE person_user_id = NEW.claimer_user_id
+       OR person_user_id = NEW.claimed_user_id
+       OR related_user_id = NEW.claimer_user_id
+       OR related_user_id = NEW.claimed_user_id;
+    DELETE FROM family_connection_cache
+    WHERE expires_at < NOW() OR person_count > 0;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `update_family_inferences_on_relationship_revoke` AFTER UPDATE ON `family_relationships` FOR EACH ROW BEGIN
+    IF OLD.active != NEW.active THEN
+        DELETE FROM family_inferences
+        WHERE person_user_id = NEW.claimer_user_id
+           OR person_user_id = NEW.claimed_user_id
+           OR related_user_id = NEW.claimer_user_id
+           OR related_user_id = NEW.claimed_user_id;
+        DELETE FROM family_connection_cache
+        WHERE expires_at < NOW() OR person_count > 0;
+    END IF;
+END
+$$
+DELIMITER ;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `memorials`
+--
+
+CREATE TABLE `memorials` (
+  `id` int(11) NOT NULL,
+  `name` varchar(200) NOT NULL,
+  `birth_date` varchar(100) DEFAULT NULL,
+  `death_date` varchar(100) DEFAULT NULL,
+  `memorial_text` text NOT NULL,
+  `photo_filename` varchar(255) DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `is_active` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `memorial_submissions`
+--
+
+CREATE TABLE `memorial_submissions` (
+  `id` int(11) NOT NULL,
+  `name` varchar(200) NOT NULL,
+  `birth_date` varchar(100) DEFAULT NULL,
+  `death_date` varchar(100) DEFAULT NULL,
+  `memorial_text` text NOT NULL,
+  `photo_filename` varchar(255) DEFAULT NULL,
+  `submitted_by` int(11) NOT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `submitted_at` timestamp NULL DEFAULT current_timestamp(),
+  `reviewed_by` int(11) DEFAULT NULL,
+  `reviewed_at` timestamp NULL DEFAULT NULL,
+  `reviewer_notes` text DEFAULT NULL,
+  `approved_memorial_id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `messages`
+--
+
+CREATE TABLE `messages` (
+  `id` int(11) NOT NULL,
+  `subject` varchar(200) NOT NULL,
+  `content` text NOT NULL,
+  `posted_by` int(11) NOT NULL,
+  `category` varchar(50) DEFAULT 'general',
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `is_active` tinyint(1) DEFAULT 1,
+  `is_pinned` tinyint(1) DEFAULT 0,
+  `is_locked` tinyint(1) DEFAULT 0,
+  `view_count` int(11) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `message_replies`
+--
+
+CREATE TABLE `message_replies` (
+  `id` int(11) NOT NULL,
+  `message_id` int(11) NOT NULL,
+  `content` text NOT NULL,
+  `posted_by` int(11) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `pending_users`
+--
+
+CREATE TABLE `pending_users` (
+  `id` int(11) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `display_name` varchar(100) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `birthday` date DEFAULT NULL,
+  `family_connection` enum('direct','married-in','other') NOT NULL,
+  `relationship_note` text NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `reviewed_at` timestamp NULL DEFAULT NULL,
+  `reviewed_by` int(11) DEFAULT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `admin_notes` text DEFAULT NULL,
+  `password_type` enum('traditional','three_field') DEFAULT 'three_field'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `people`
+--
+
+CREATE TABLE `people` (
+  `id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `normalized_name` varchar(255) NOT NULL,
+  `display_name` varchar(255) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `created_by_user_id` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `photo_submissions`
+--
+
+CREATE TABLE `photo_submissions` (
+  `id` int(11) NOT NULL,
+  `filename` varchar(255) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `file_type` varchar(100) DEFAULT NULL,
+  `file_size` int(11) DEFAULT NULL,
+  `storage_key` varchar(512) DEFAULT NULL,
+  `storage_provider` enum('local','r2') NOT NULL DEFAULT 'local',
+  `mime_type` varchar(100) DEFAULT NULL,
+  `uploader_id` int(11) NOT NULL,
+  `event_name` varchar(200) DEFAULT NULL,
+  `date_taken` varchar(100) DEFAULT NULL,
+  `people_in_photo` text DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `photo_title` varchar(200) DEFAULT NULL,
+  `photo_description` text DEFAULT NULL,
+  `location_name` varchar(200) DEFAULT NULL,
+  `location_city` varchar(100) DEFAULT NULL,
+  `location_state` varchar(50) DEFAULT NULL,
+  `suggested_album` varchar(100) DEFAULT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `uploaded_at` timestamp NULL DEFAULT current_timestamp(),
+  `reviewed_by` int(11) DEFAULT NULL,
+  `reviewed_at` timestamp NULL DEFAULT NULL,
+  `reviewer_notes` text DEFAULT NULL,
+  `final_album` varchar(100) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `photo_tags`
+--
+
+CREATE TABLE `photo_tags` (
+  `id` int(11) NOT NULL,
+  `photo_id` int(11) NOT NULL,
+  `person_name` varchar(100) NOT NULL,
+  `tagged_by_user_id` int(11) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `private_messages`
+--
+
+CREATE TABLE `private_messages` (
+  `id` int(11) NOT NULL,
+  `sender_id` int(11) NOT NULL,
+  `recipient_id` int(11) NOT NULL,
+  `subject` varchar(200) DEFAULT NULL,
+  `content` text NOT NULL,
+  `is_important` tinyint(1) DEFAULT 0,
+  `is_read` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `recipes`
+--
+
+CREATE TABLE `recipes` (
+  `id` int(11) NOT NULL,
+  `name` varchar(200) NOT NULL,
+  `category` varchar(50) DEFAULT NULL,
+  `difficulty` varchar(20) DEFAULT NULL,
+  `serves` int(11) DEFAULT NULL,
+  `prep_time` varchar(100) DEFAULT NULL,
+  `cook_time` varchar(100) DEFAULT NULL,
+  `ingredients` text NOT NULL,
+  `instructions` text NOT NULL,
+  `story` text DEFAULT NULL,
+  `source` varchar(200) DEFAULT NULL,
+  `occasion` varchar(200) DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `is_active` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `recipe_modifications`
+--
+
+CREATE TABLE `recipe_modifications` (
+  `id` int(11) NOT NULL,
+  `recipe_id` int(11) NOT NULL,
+  `modified_by` int(11) NOT NULL,
+  `modification_text` text NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `relationship_notifications`
+--
+
+CREATE TABLE `relationship_notifications` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `type` enum('claim_made','claim_revoked','relationship_suggested') NOT NULL,
+  `relationship_id` int(11) DEFAULT NULL,
+  `claimer_user_id` int(11) DEFAULT NULL,
+  `message` text NOT NULL,
+  `read_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `display_name` varchar(100) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `birthday` date DEFAULT NULL,
+  `is_admin` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `last_login` timestamp NULL DEFAULT NULL,
+  `cousin_connect_available` tinyint(1) DEFAULT 0,
+  `cousin_connect_interests` text DEFAULT NULL,
+  `cousin_connect_since` timestamp NULL DEFAULT NULL,
+  `password_type` enum('traditional','three_field') DEFAULT 'three_field'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+--
+-- Indexes for dumped tables
+--
+
+ALTER TABLE `admin_messages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `resolved_by` (`resolved_by`);
+
+ALTER TABLE `albums`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `folder_name` (`folder_name`),
+  ADD KEY `created_by` (`created_by`);
+
+ALTER TABLE `calendar_events`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `created_by` (`created_by`);
+
+ALTER TABLE `content_tags`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_content_tag` (`person_id`,`content_type`,`content_id`),
+  ADD KEY `idx_person_content` (`person_id`,`content_type`),
+  ADD KEY `idx_content_lookup` (`content_type`,`content_id`),
+  ADD KEY `tagged_by_user_id` (`tagged_by_user_id`);
+
+ALTER TABLE `event_commitments`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_commitment` (`event_id`,`user_id`),
+  ADD KEY `user_id` (`user_id`);
+
+ALTER TABLE `event_submissions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `submitter_id` (`submitter_id`),
+  ADD KEY `reviewed_by` (`reviewed_by`),
+  ADD KEY `approved_event_id` (`approved_event_id`);
+
+ALTER TABLE `family_connection_cache`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_cache_key` (`cache_key`),
+  ADD KEY `idx_expiry` (`expires_at`);
+
+ALTER TABLE `family_inferences`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_inference` (`person_user_id`,`related_user_id`,`relationship`),
+  ADD KEY `idx_person_inferences` (`person_user_id`,`relationship`),
+  ADD KEY `idx_related_inferences` (`related_user_id`,`relationship`);
+
+ALTER TABLE `family_relationships`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_claim` (`claimer_user_id`,`claimed_user_id`,`relationship`),
+  ADD KEY `idx_claimer_lookup` (`claimer_user_id`,`relationship`,`active`),
+  ADD KEY `idx_claimed_lookup` (`claimed_user_id`,`relationship`,`active`),
+  ADD KEY `idx_active_relationships` (`active`,`relationship`),
+  ADD KEY `revoked_by` (`revoked_by`);
+
+ALTER TABLE `memorials`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `created_by` (`created_by`);
+
+ALTER TABLE `memorial_submissions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `submitted_by` (`submitted_by`),
+  ADD KEY `reviewed_by` (`reviewed_by`);
+
+ALTER TABLE `messages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `posted_by` (`posted_by`);
+
+ALTER TABLE `message_replies`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `message_id` (`message_id`),
+  ADD KEY `posted_by` (`posted_by`);
+
+ALTER TABLE `pending_users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `username` (`username`),
+  ADD KEY `reviewed_by` (`reviewed_by`);
+
+ALTER TABLE `people`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_normalized_name` (`normalized_name`),
+  ADD KEY `idx_name_search` (`normalized_name`,`display_name`),
+  ADD KEY `created_by_user_id` (`created_by_user_id`);
+
+ALTER TABLE `photo_submissions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `uploader_id` (`uploader_id`),
+  ADD KEY `reviewed_by` (`reviewed_by`),
+  ADD KEY `idx_location_city` (`location_city`),
+  ADD KEY `idx_date_taken` (`date_taken`),
+  ADD KEY `idx_storage_key` (`storage_key`),
+  ADD KEY `idx_storage_provider` (`storage_provider`);
+
+ALTER TABLE `photo_tags`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `tagged_by_user_id` (`tagged_by_user_id`),
+  ADD KEY `idx_photo_id` (`photo_id`),
+  ADD KEY `idx_person_name` (`person_name`);
+
+ALTER TABLE `private_messages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_sender` (`sender_id`),
+  ADD KEY `idx_recipient` (`recipient_id`),
+  ADD KEY `idx_conversation` (`sender_id`,`recipient_id`),
+  ADD KEY `idx_created_at` (`created_at`),
+  ADD KEY `idx_is_read` (`is_read`);
+
+ALTER TABLE `recipes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `created_by` (`created_by`);
+
+ALTER TABLE `recipe_modifications`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `recipe_id` (`recipe_id`),
+  ADD KEY `modified_by` (`modified_by`);
+
+ALTER TABLE `relationship_notifications`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_user_notifications` (`user_id`,`read_at`,`created_at`),
+  ADD KEY `idx_relationship_notifications` (`relationship_id`),
+  ADD KEY `claimer_user_id` (`claimer_user_id`);
+
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `username` (`username`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+ALTER TABLE `admin_messages` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `albums` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `calendar_events` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `content_tags` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `event_commitments` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `event_submissions` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `family_connection_cache` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `family_inferences` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `family_relationships` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `memorials` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `memorial_submissions` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `messages` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `message_replies` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `pending_users` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `people` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `photo_submissions` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `photo_tags` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `private_messages` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `recipes` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `recipe_modifications` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `relationship_notifications` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `users` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- Constraints for dumped tables
+--
+
+ALTER TABLE `admin_messages`
+  ADD CONSTRAINT `admin_messages_ibfk_1` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `albums`
+  ADD CONSTRAINT `albums_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `calendar_events`
+  ADD CONSTRAINT `calendar_events_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `content_tags`
+  ADD CONSTRAINT `content_tags_ibfk_1` FOREIGN KEY (`person_id`) REFERENCES `people` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `content_tags_ibfk_2` FOREIGN KEY (`tagged_by_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `event_commitments`
+  ADD CONSTRAINT `event_commitments_ibfk_1` FOREIGN KEY (`event_id`) REFERENCES `calendar_events` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `event_commitments_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `event_submissions`
+  ADD CONSTRAINT `event_submissions_ibfk_1` FOREIGN KEY (`submitter_id`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `event_submissions_ibfk_2` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `event_submissions_ibfk_3` FOREIGN KEY (`approved_event_id`) REFERENCES `calendar_events` (`id`);
+
+ALTER TABLE `family_inferences`
+  ADD CONSTRAINT `family_inferences_ibfk_1` FOREIGN KEY (`person_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `family_inferences_ibfk_2` FOREIGN KEY (`related_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `family_relationships`
+  ADD CONSTRAINT `family_relationships_ibfk_1` FOREIGN KEY (`claimer_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `family_relationships_ibfk_2` FOREIGN KEY (`claimed_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `family_relationships_ibfk_3` FOREIGN KEY (`revoked_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+ALTER TABLE `memorials`
+  ADD CONSTRAINT `memorials_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `memorial_submissions`
+  ADD CONSTRAINT `memorial_submissions_ibfk_1` FOREIGN KEY (`submitted_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `memorial_submissions_ibfk_2` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `messages`
+  ADD CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`posted_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `message_replies`
+  ADD CONSTRAINT `message_replies_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `messages` (`id`),
+  ADD CONSTRAINT `message_replies_ibfk_2` FOREIGN KEY (`posted_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `pending_users`
+  ADD CONSTRAINT `pending_users_ibfk_1` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `people`
+  ADD CONSTRAINT `people_ibfk_1` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `photo_submissions`
+  ADD CONSTRAINT `photo_submissions_ibfk_1` FOREIGN KEY (`uploader_id`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `photo_submissions_ibfk_2` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `photo_tags`
+  ADD CONSTRAINT `photo_tags_ibfk_1` FOREIGN KEY (`photo_id`) REFERENCES `photo_submissions` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `photo_tags_ibfk_2` FOREIGN KEY (`tagged_by_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `private_messages`
+  ADD CONSTRAINT `private_messages_ibfk_1` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `private_messages_ibfk_2` FOREIGN KEY (`recipient_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `recipes`
+  ADD CONSTRAINT `recipes_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `recipe_modifications`
+  ADD CONSTRAINT `recipe_modifications_ibfk_1` FOREIGN KEY (`recipe_id`) REFERENCES `recipes` (`id`),
+  ADD CONSTRAINT `recipe_modifications_ibfk_2` FOREIGN KEY (`modified_by`) REFERENCES `users` (`id`);
+
+ALTER TABLE `relationship_notifications`
+  ADD CONSTRAINT `relationship_notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `relationship_notifications_ibfk_2` FOREIGN KEY (`relationship_id`) REFERENCES `family_relationships` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `relationship_notifications_ibfk_3` FOREIGN KEY (`claimer_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

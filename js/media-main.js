@@ -227,11 +227,7 @@ function createLibraryEntry(item) {
     entry.innerHTML = `
         <div class="entry-icon">${icon}</div>
         <div class="entry-content">
-            <h3 class="entry-title">
-                <a href="#" onclick="openMedia(${JSON.stringify(item).replace(/"/g, '&quot;')}); return false;">
-                    ${item.title}
-                </a>
-            </h3>
+            <h3 class="entry-title">${item.title}</h3>
             <p class="entry-subtitle">${item.subtitle}</p>
             <div class="entry-meta">
                 <span class="meta-item">
@@ -248,13 +244,19 @@ function createLibraryEntry(item) {
                 </span>
             </div>
         </div>
+        <div class="entry-actions">
+            <button class="download-btn" onclick='downloadMedia(${JSON.stringify(item).replace(/'/g, "\\'")}); event.stopPropagation();'>
+                <span class="btn-icon">⬇</span>
+                Download
+            </button>
+        </div>
     `;
-    
-    // Set click handler to open media
+
+    // Set click handler to download media
     entry.addEventListener('click', function(e) {
-        // Don't open if clicking on a link
-        if (!e.target.closest('a')) {
-            openMedia(item);
+        // Don't trigger if clicking the download button
+        if (!e.target.closest('.download-btn')) {
+            downloadMedia(item);
         }
     });
     
@@ -293,15 +295,23 @@ function getMediaIcon(item) {
     }
 }
 
-// Open media in appropriate viewer
+// Download media file directly
 function openMedia(item) {
-    if (item.type === 'video' || item.type === 'audio') {
-        // Open video/audio viewer
-        window.open(`video-viewer.php?id=${item.id}`, '_blank');
-    } else {
-        // Open document viewer
-        window.open(`document-viewer.php?id=${item.id}`, '_blank');
-    }
+    downloadMedia(item);
+}
+
+// Download media file
+function downloadMedia(item) {
+    // Create temporary download link
+    const link = document.createElement('a');
+    link.href = item.filePath;
+    link.download = item.title || 'media-file';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showMessage(`Downloading ${item.title}...`, 'success');
 }
 
 // Filter functionality
@@ -587,6 +597,7 @@ function showMessage(text, type = 'info') {
 // Global functions for HTML onclick handlers
 window.loadMoreMedia = loadMoreMedia;
 window.openMedia = openMedia;
+window.downloadMedia = downloadMedia;
 
 
 // Enhanced showMessage for admin actions

@@ -45,21 +45,21 @@ try {
             $personContent['photos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         
-        // Get media if requested
+        // Get media if requested (videos/documents from photo_submissions with non-image mime types)
         if ($contentType === 'all' || $contentType === 'media') {
             try {
                 $stmt = $pdo->prepare("
-                    SELECT ms.*, 'media' as content_type
-                    FROM media_submissions ms
-                    JOIN content_tags ct ON ct.content_id = ms.id AND ct.content_type = 'media'
-                    WHERE ct.person_id = ? AND ms.status = 'approved'
-                    ORDER BY ms.uploaded_at DESC
+                    SELECT ps.*, 'media' as content_type
+                    FROM photo_submissions ps
+                    JOIN content_tags ct ON ct.content_id = ps.id AND ct.content_type = 'media'
+                    WHERE ct.person_id = ? AND ps.status = 'approved'
+                    AND (ps.mime_type NOT LIKE 'image/%' OR ps.file_type NOT LIKE 'image/%')
+                    ORDER BY ps.uploaded_at DESC
                     LIMIT 5
                 ");
                 $stmt->execute([$person['id']]);
                 $personContent['media'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
             } catch (Exception $e) {
-                // Media table might not exist yet
                 $personContent['media'] = [];
             }
         }

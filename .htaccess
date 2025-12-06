@@ -1,0 +1,44 @@
+# Kin Circle - PHP Configuration
+# Increase file upload limits for media files (videos, etc.)
+
+# Maximum size for uploaded files (500MB)
+php_value upload_max_filesize 500M
+
+# Maximum size for POST data (should be larger than upload_max_filesize)
+php_value post_max_size 520M
+
+# Maximum execution time for scripts (5 minutes for large uploads)
+php_value max_execution_time 300
+
+# Maximum time to parse input data (5 minutes)
+php_value max_input_time 300
+
+# Memory limit for PHP scripts
+php_value memory_limit 512M
+
+# Enable error display (useful for debugging - disable in production)
+# php_flag display_errors Off
+# php_flag display_startup_errors Off
+
+# Security headers
+<IfModule mod_headers.c>
+    # Prevent MIME type sniffing
+    Header set X-Content-Type-Options "nosniff"
+
+    # Enable XSS protection
+    Header set X-XSS-Protection "1; mode=block"
+
+    # Prevent clickjacking
+    Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+<Files "r2-config.php">
+    Require all denied
+</Files>
+
+# Prevent directory listing
+Options -Indexes
+
+# Custom error pages (optional - create these files if needed)
+# ErrorDocument 404 /404.php
+# ErrorDocument 500 /500.php

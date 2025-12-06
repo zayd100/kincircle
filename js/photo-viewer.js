@@ -98,14 +98,30 @@ function processAlbumData(album, albumName) {
         photos: album.photos.map(photo => {
             // Handle both old string format and new object format
             if (typeof photo === 'string') {
+                // For strings, check if already absolute URL
+                const src = photo.startsWith('http') ? photo : `../../${photo}`;
                 return {
-                    src: `../../${photo}`,
+                    src: src,
                     filename: photo.split('/').pop()
                 };
             } else {
+                // For objects, ensure URL is absolute (R2 URLs)
+                let src = photo.src || '';
+
+                // Check if it's an absolute URL
+                if (src.startsWith('http://') || src.startsWith('https://')) {
+                    // Already absolute, use as-is
+                } else if (src.includes('r2.cloudflarestorage.com')) {
+                    // Has R2 domain but missing protocol - add it
+                    src = 'https://' + src.replace(/^\/+/, '');
+                } else if (src) {
+                    // Relative path, prepend path
+                    src = `../../${src}`;
+                }
+
                 return {
-                    id: photo.id || null,  // Database ID for tagging
-                    src: `../../${photo.src}`,
+                    id: photo.id || null,
+                    src: src,
                     filename: photo.filename,
                     title: photo.title || null,
                     desc: photo.desc || photo.description || null,
@@ -126,14 +142,14 @@ function displayPhoto() {
         showError('Photo not found');
         return;
     }
-    
+
     const photo = allPhotos[currentPhotoIndex];
     const photoElement = document.getElementById('mainPhoto');
     const photoContainer = document.querySelector('.photo-container');
-    
+
     // Show loading
     photoContainer.classList.add('loading');
-    
+
     // Update photo
     photoElement.src = photo.src;
     photoElement.alt = photo.title;
@@ -145,9 +161,19 @@ function displayPhoto() {
     };
     
     photoElement.onerror = () => {
-        // Try alternative path
-        const altPath = photo.src.replace('../../', '../');
-        photoElement.src = altPath;
+        // Only try fallback once to prevent infinite loop
+        if (!photoElement.dataset.retried) {
+            photoElement.dataset.retried = 'true';
+            // For R2 URLs, don't try to modify the path
+            if (photo.src && !photo.src.startsWith('http')) {
+                const altPath = photo.src.replace('../../', '../');
+                photoElement.src = altPath;
+            } else {
+                // Show placeholder for failed external URLs
+                photoElement.src = '/images/placeholder.png';
+                console.error('Failed to load image:', photo.src);
+            }
+        }
     };
     
     // Load tags for this photo
@@ -289,19 +315,26 @@ async function loadPhotoTags() {
 // Display current tags
 function displayCurrentTags(tags) {
     const tagsContainer = document.getElementById('currentTags');
-    if (!tagsContainer) return;
-    
-    if (tags.length === 0) {
+    if (!tagsContainer) {
+        console.error('Tags container not found!');
+        return;
+    }
+
+    console.log('Displaying tags:', tags);
+
+    if (!tags || tags.length === 0) {
         tagsContainer.innerHTML = '<p class="no-tags">No people tagged yet</p>';
         return;
     }
-    
+
     tagsContainer.innerHTML = tags.map(tag => `
         <div class="photo-tag">
             ${tag.person_name}
             <button class="tag-remove-btn" onclick="removeTag(${tag.id})">×</button>
         </div>
     `).join('');
+
+    console.log('Tags displayed, HTML:', tagsContainer.innerHTML);
 }
 
 // Add new tag
@@ -878,18 +911,19 @@ async function deletePhoto() {
         return;
     }
 
-    try {
-        // Extract filename from path
-        const filename = currentPhoto.src.split('/').pop();
+    if (!currentPhoto.id) {
+        showMessage('Cannot delete: Photo ID not available', 'error');
+        return;
+    }
 
+    try {
         const response = await fetch('/api/delete-photo.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                filename: filename,
-                album: currentAlbum.name
+                id: currentPhoto.id
             })
         });
 
@@ -903,7 +937,7 @@ async function deletePhoto() {
 
             // Navigate to next photo or close if no more photos
             if (allPhotos.length === 0) {
-                window.location.href = '../photos.php';
+                window.location.href = '/photos.php';
             } else {
                 if (currentPhotoIndex >= allPhotos.length) {
                     currentPhotoIndex = allPhotos.length - 1;
@@ -1148,9 +1182,13 @@ async function addSingleTag() {
     const photo = allPhotos[currentPhotoIndex];
 
     if (!photo.id) {
-        showMessage('Photo ID not available', 'error');
+        console.error('Photo object:', photo);
+        console.error('All photos:', allPhotos);
+        showMessage('Photo ID not available - check console', 'error');
         return;
     }
+
+    console.log('Tagging photo ID:', photo.id);
 
     try {
         // First, search for or create the person

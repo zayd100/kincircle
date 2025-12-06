@@ -20,7 +20,26 @@ try {
         ORDER BY r.created_at DESC
     ");
     $stmt->execute();
-    $recipes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $recipesRaw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Convert text fields to arrays for JS consumption
+    $recipes = array_map(function($recipe) {
+        // Parse ingredients and instructions from newline-separated text to arrays
+        $recipe['ingredients'] = !empty($recipe['ingredients'])
+            ? array_filter(array_map('trim', explode("\n", $recipe['ingredients'])))
+            : [];
+        $recipe['instructions'] = !empty($recipe['instructions'])
+            ? array_filter(array_map('trim', explode("\n", $recipe['instructions'])))
+            : [];
+        // Add author field for JS compatibility
+        $recipe['author'] = $recipe['created_by_name'] ?? 'Unknown';
+        // Add description from story if not present
+        $recipe['description'] = $recipe['story'] ?? '';
+        // Rename time fields for JS compatibility
+        $recipe['prepTime'] = $recipe['prep_time'] ?? '';
+        $recipe['cookTime'] = $recipe['cook_time'] ?? '';
+        return $recipe;
+    }, $recipesRaw);
     
     // Get recipe categories/stats
     $categoriesStmt = $pdo->prepare("

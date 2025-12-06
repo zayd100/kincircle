@@ -49,7 +49,7 @@ class AdminCore {
                 name: 'media',
                 title: 'Media Management',
                 icon: '🎬',
-                path: 'js/media-admin.js',
+                path: 'js/media-admin.js?v=' + Date.now(),
                 priority: 4
             },
             {
@@ -143,8 +143,8 @@ class AdminCore {
     async renderDashboard() {
         this.renderModuleNavigation();
         this.renderActiveModule();
-        // Render stats after modules are rendered to ensure they can provide data
-        await this.renderStats();
+        // Don't render stats on initial load - PHP already provides accurate counts
+        // Stats will be refreshed when modules load data or after actions
     }
 
     async refreshStats() {
@@ -153,31 +153,41 @@ class AdminCore {
     
     async renderStats() {
         const statsContainer = document.getElementById('adminStats');
-        
-        // Collect stats from all loaded modules
-        const statCards = [
-            { label: 'Pending Photos', value: '-', class: 'pending' },
-            { label: 'Pending Media', value: '-', class: 'media' },
-            { label: 'Reported Content', value: '-', class: 'reports' },
-            { label: 'New Users', value: '-', class: 'users' },
-            { label: 'Pending Events', value: '-', class: 'events' }
-        ];
-        
+        if (!statsContainer) return;
+
         // Try to get actual stats from modules
         for (const module of this.modules.filter(m => m.loaded)) {
             try {
                 if (module.getStats) {
                     const moduleStats = await module.getStats();
-                    
-                    // Map module stats to our predefined cards
+
+                    // Update stat cards with module data
                     if (Array.isArray(moduleStats)) {
                         moduleStats.forEach(stat => {
-                            const card = statCards.find(c => 
-                                c.label.toLowerCase().includes(stat.label.toLowerCase()) ||
-                                stat.label.toLowerCase().includes(c.label.toLowerCase().split(' ')[0])
-                            );
-                            if (card) {
-                                card.value = stat.value;
+                            // Only update if we have a valid value (including 0, but not undefined or null)
+                            if (stat.value !== undefined && stat.value !== null && typeof stat.value === 'number') {
+                                // Find the matching stat card
+                                let card = null;
+
+                                // Try to match by label
+                                if (stat.label.toLowerCase().includes('photo') && !stat.label.toLowerCase().includes('media')) {
+                                    card = statsContainer.querySelector('.stat-card.pending .stat-number');
+                                } else if (stat.label.toLowerCase().includes('media')) {
+                                    card = statsContainer.querySelector('.stat-card.media .stat-number');
+                                } else if (stat.label.toLowerCase().includes('memorial')) {
+                                    card = statsContainer.querySelector('.stat-card.memorials .stat-number');
+                                } else if (stat.label.toLowerCase().includes('report')) {
+                                    card = statsContainer.querySelector('.stat-card.reports .stat-number');
+                                } else if (stat.label.toLowerCase().includes('user')) {
+                                    card = statsContainer.querySelector('.stat-card.users .stat-number');
+                                } else if (stat.label.toLowerCase().includes('event')) {
+                                    card = statsContainer.querySelector('.stat-card.events .stat-number');
+                                }
+
+                                // Update the card if found
+                                if (card) {
+                                    card.textContent = stat.value;
+                                }
                             }
                         });
                     }
@@ -186,14 +196,6 @@ class AdminCore {
                 console.warn(`Error getting stats from ${module.name}:`, error);
             }
         }
-        
-        // Update the existing stat cards in place
-        statCards.forEach(stat => {
-            const card = statsContainer.querySelector(`.stat-card.${stat.class} .stat-number`);
-            if (card) {
-                card.textContent = stat.value;
-            }
-        });
     }
     
     renderModuleNavigation() {

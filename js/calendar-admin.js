@@ -5,7 +5,8 @@ class CalendarAdmin {
         this.pendingEvents = [];
         this.approvedEvents = [];
         this.currentEvent = null;
-        
+        this.dataLoaded = false;
+
         this.init();
     }
     
@@ -48,8 +49,9 @@ class CalendarAdmin {
     
     async render(container) {
         // Load data if not already loaded
-        if (this.pendingEvents.length === 0 && this.approvedEvents.length === 0) {
+        if (!this.dataLoaded) {
             await this.loadEventData();
+            this.dataLoaded = true;
         }
         
         const pendingCount = this.pendingEvents.length;

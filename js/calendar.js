@@ -660,7 +660,22 @@ class FamilyTimeMachine {
         };
         return emojiMap[type] || '📅';
     }
-    
+
+    // Parse a YYYY-MM-DD date string as LOCAL time (not UTC)
+    // This prevents the off-by-one-day bug in western time zones
+    parseLocalDate(dateStr) {
+        if (!dateStr) return new Date();
+        // If it's already a Date object, return it
+        if (dateStr instanceof Date) return dateStr;
+        // If it includes time info, parse normally
+        if (dateStr.includes('T') || dateStr.includes(' ')) {
+            return new Date(dateStr);
+        }
+        // For date-only strings like "2025-12-05", parse as local midnight
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+
     formatDateKey(date) {
         if (!date) {
             console.error('formatDateKey called with null/undefined date');

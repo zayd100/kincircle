@@ -54,6 +54,7 @@ try {
         'type' => determineMediaType($item['mime_type'] ?? $item['file_type']),
         'subtype' => (strpos($item['mime_type'] ?? $item['file_type'], 'pdf') !== false) ? 'pdf' : 'text',
         'filePath' => '/uploads/albums/' . $item['final_album'] . '/' . $item['filename'],
+        'file_path' => '/uploads/albums/' . $item['final_album'] . '/' . $item['filename'],
         'file_size' => $item['file_size'],
         'fileSize' => formatFileSize($item['file_size']),
         'uploaded_by' => $item['uploader_name'] ?: 'Unknown',

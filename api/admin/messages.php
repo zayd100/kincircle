@@ -18,24 +18,40 @@ try {
     $stmt = $pdo->query("SELECT COUNT(*) as total FROM message_replies");
     $totalReplies = $stmt->fetch()['total'];
     
-    // Get recent messages
+    // Get recent messages/board threads for admin
     $stmt = $pdo->prepare("
-        SELECT m.*, u.display_name as author_name,
-               COUNT(mr.id) as reply_count
-        FROM messages m 
-        JOIN users u ON m.posted_by = u.id 
+        SELECT m.id, m.subject as title, m.content, m.created_at,
+               m.posted_by as user_id, u.display_name as author_name,
+               COUNT(DISTINCT mr.id) as reply_count,
+               'active' as status, 0 as report_count,
+               'general' as category, 0 as is_pinned, 0 as is_locked
+        FROM messages m
+        JOIN users u ON m.posted_by = u.id
         LEFT JOIN message_replies mr ON m.id = mr.message_id
-        WHERE m.is_active = 1 
+        WHERE m.is_active = 1
         GROUP BY m.id
-        ORDER BY m.created_at DESC 
-        LIMIT 10
+        ORDER BY m.created_at DESC
     ");
     $stmt->execute();
-    $messages = $stmt->fetchAll();
-    
+    $threads = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Transform data to match admin expectations
+    foreach ($threads as &$thread) {
+        $thread['author'] = [
+            'name' => $thread['author_name'],
+            'id' => $thread['user_id']
+        ];
+        $thread['isPinned'] = (bool)$thread['is_pinned'];
+        $thread['isLocked'] = (bool)$thread['is_locked'];
+        $thread['replyCount'] = (int)$thread['reply_count'];
+        $thread['reportCount'] = (int)$thread['report_count'];
+        $thread['createdAt'] = $thread['created_at'];
+    }
+
     echo json_encode([
-        'success' => true, 
-        'messages' => $messages,
+        'success' => true,
+        'boardThreads' => $threads,  // Changed from 'messages' to 'boardThreads'
+        'reportedMessages' => [],     // No reported messages yet
         'stats' => [
             'total' => $totalMessages,
             'replies' => $totalReplies

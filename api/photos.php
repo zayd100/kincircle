@@ -1,77 +1,71 @@
 <?php
 require_once '../config.php';
+require_once '../lib/R2.php';
+
 requireLogin();
 
 header('Content-Type: application/json');
 
 try {
     $photos = [];
-    $albums = [];
-    $albumsPath = '../uploads/albums';
+    $albumsMap = [];
+    $r2 = new R2();
 
-    // Scan all album directories
-    if (is_dir($albumsPath)) {
-        $albumDirs = array_filter(glob($albumsPath . '/*'), 'is_dir');
+    // Get all approved photos from database
+    $stmt = $pdo->prepare("
+        SELECT ps.*, u.display_name as uploader_name
+        FROM photo_submissions ps
+        LEFT JOIN users u ON ps.uploader_id = u.id
+        WHERE ps.status = 'approved'
+        AND (ps.mime_type LIKE 'image/%' OR ps.file_type LIKE 'image/%')
+        ORDER BY ps.uploaded_at DESC
+    ");
+    $stmt->execute();
+    $dbPhotos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($albumDirs as $albumDir) {
-            $albumName = basename($albumDir);
-            $metadataFile = $albumDir . '/album.json';
-
-            // Load album metadata
-            $albumMetadata = [];
-            if (file_exists($metadataFile)) {
-                $albumMetadata = json_decode(file_get_contents($metadataFile), true);
-            }
-
-            // Get all image files in this album
-            $imageFiles = glob($albumDir . '/*.{jpg,jpeg,png,gif,JPG,JPEG,PNG,GIF}', GLOB_BRACE);
-
-            $albumPhotos = [];
-            foreach ($imageFiles as $imagePath) {
-                $filename = basename($imagePath);
-
-                // Try to get submission data from database
-                $photoData = null;
-                try {
-                    $stmt = $pdo->prepare("
-                        SELECT * FROM photo_submissions
-                        WHERE filename = ? AND status = 'approved'
-                    ");
-                    $stmt->execute([$filename]);
-                    $photoData = $stmt->fetch(PDO::FETCH_ASSOC);
-                } catch (Exception $e) {
-                    // Database might not have this photo
-                }
-
-                $photo = [
-                    'filename' => $filename,
-                    'path' => '/uploads/albums/' . $albumName . '/' . $filename,
-                    'album' => $albumName,
-                    'album_display' => $albumMetadata['display_name'] ?? ucfirst($albumName),
-                    'event_name' => $photoData['event_name'] ?? '',
-                    'date_taken' => $photoData['date_taken'] ?? '',
-                    'people_in_photo' => $photoData['people_in_photo'] ?? '',
-                    'description' => $photoData['description'] ?? '',
-                    'uploaded_at' => $photoData['uploaded_at'] ?? date('Y-m-d H:i:s', filemtime($imagePath))
-                ];
-
-                $albumPhotos[] = $photo;
-                $photos[] = $photo;
-            }
-
-            if (!empty($albumPhotos)) {
-                $albums[] = [
-                    'name' => $albumName,
-                    'display_name' => $albumMetadata['display_name'] ?? ucfirst($albumName),
-                    'emoji' => $albumMetadata['emoji'] ?? '📸',
-                    'description' => $albumMetadata['description'] ?? '',
-                    'date_range' => $albumMetadata['date_range'] ?? '',
-                    'photo_count' => count($albumPhotos),
-                    'photos' => $albumPhotos
-                ];
-            }
+    foreach ($dbPhotos as $photoData) {
+        // Skip records without storage_key (old data)
+        if (empty($photoData['storage_key'])) {
+            continue;
         }
+
+        $albumName = $photoData['final_album'] ?: 'unsorted';
+        $path = $r2->getDownloadUrl($photoData['storage_key']);
+
+        $photo = [
+            'id' => $photoData['id'],
+            'filename' => $photoData['filename'],
+            'original_name' => $photoData['original_name'],
+            'path' => $path,
+            'album' => $albumName,
+            'album_display' => ucfirst(str_replace('_', ' ', $albumName)),
+            'event_name' => $photoData['event_name'] ?? '',
+            'date_taken' => $photoData['date_taken'] ?? '',
+            'people_in_photo' => $photoData['people_in_photo'] ?? '',
+            'description' => $photoData['description'] ?? '',
+            'uploaded_at' => $photoData['uploaded_at'],
+            'uploaded_by' => $photoData['uploader_name'] ?? 'Unknown'
+        ];
+
+        $photos[] = $photo;
+
+        if (!isset($albumsMap[$albumName])) {
+            $albumsMap[$albumName] = [
+                'name' => $albumName,
+                'display_name' => ucfirst(str_replace('_', ' ', $albumName)),
+                'emoji' => '📸',
+                'description' => '',
+                'date_range' => '',
+                'photo_count' => 0,
+                'photos' => []
+            ];
+        }
+
+        $albumsMap[$albumName]['photos'][] = $photo;
+        $albumsMap[$albumName]['photo_count']++;
     }
+
+    $albums = array_values($albumsMap);
 
     echo json_encode([
         'success' => true,

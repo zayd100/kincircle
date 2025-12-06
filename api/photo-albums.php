@@ -1,86 +1,79 @@
 <?php
+// Buffer output to catch any PHP warnings/errors
+ob_start();
+
 require_once '../config.php';
+require_once '../lib/R2.php';
+
 requireLogin();
 
 header('Content-Type: application/json');
 
+// Clear any buffered output (PHP warnings, etc.)
+ob_clean();
+
 try {
-    $albums = [];
-    $albumsPath = '../uploads/albums';
+    $albumsMap = [];
+    $r2 = new R2();
 
-    // Check if albums directory exists
-    if (is_dir($albumsPath)) {
-        $directories = array_filter(glob($albumsPath . '/*'), 'is_dir');
+    // Get all approved photos from database
+    $stmt = $pdo->prepare("
+        SELECT ps.*, u.display_name as uploader_name
+        FROM photo_submissions ps
+        LEFT JOIN users u ON ps.uploader_id = u.id
+        WHERE ps.status = 'approved'
+        AND (ps.mime_type LIKE 'image/%' OR ps.file_type LIKE 'image/%')
+        ORDER BY ps.uploaded_at DESC
+    ");
+    $stmt->execute();
+    $dbPhotos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($directories as $dir) {
-            $folderName = basename($dir);
-            $metadataFile = $dir . '/album.json';
+    foreach ($dbPhotos as $photoData) {
+        // Skip records without storage_key (old data)
+        if (empty($photoData['storage_key'])) {
+            continue;
+        }
 
-            // Load album metadata
-            $metadata = [];
-            if (file_exists($metadataFile)) {
-                $metadata = json_decode(file_get_contents($metadataFile), true);
-            }
+        $albumName = $photoData['final_album'] ?: 'unsorted';
 
-            // Get all image files in this album
-            $imageFiles = glob($dir . '/*.{jpg,jpeg,png,gif,JPG,JPEG,PNG,GIF}', GLOB_BRACE);
-            $photoCount = count($imageFiles);
+        // Generate R2 URL
+        $src = $r2->getDownloadUrl($photoData['storage_key']);
 
-            // Build photos array - just paths as strings for frontend compatibility
-            $photos = [];
-            foreach ($imageFiles as $imagePath) {
-                $filename = basename($imagePath);
+        $photo = [
+            'id' => $photoData['id'],
+            'src' => $src,
+            'filename' => $photoData['filename'],
+            'title' => $photoData['photo_title'] ?? $photoData['event_name'] ?? '',
+            'desc' => $photoData['photo_description'] ?? $photoData['description'] ?? '',
+            'description' => $photoData['photo_description'] ?? $photoData['description'] ?? '',
+            'date' => $photoData['date_taken'] ?? '',
+            'event' => $photoData['event_name'] ?? '',
+            'people' => $photoData['people_in_photo'] ?? ''
+        ];
 
-                // Try to get metadata from database
-                $photoData = [
-                    'src' => 'uploads/albums/' . $folderName . '/' . $filename,
-                    'filename' => $filename
-                ];
-
-                try {
-                    $stmt = $pdo->prepare("
-                        SELECT id, photo_title, photo_description, date_taken, event_name,
-                               location_name, location_city, location_state
-                        FROM photo_submissions
-                        WHERE filename = ? AND final_album = ? AND status = 'approved'
-                        LIMIT 1
-                    ");
-                    $stmt->execute([$filename, $folderName]);
-                    $dbData = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                    if ($dbData) {
-                        $photoData['id'] = $dbData['id'];  // Database ID needed for tagging
-                        $photoData['title'] = $dbData['photo_title'];
-                        $photoData['desc'] = $photoData['description'] = $dbData['photo_description'];
-                        $photoData['date'] = $dbData['date_taken'];
-                        $photoData['event'] = $dbData['event_name'];
-                        $photoData['location'] = $dbData['location_name'];
-                        $photoData['city'] = $dbData['location_city'];
-                        $photoData['state'] = $dbData['location_state'];
-                    }
-                } catch (Exception $e) {
-                    error_log("Error fetching photo metadata for $filename: " . $e->getMessage());
-                }
-
-                $photos[] = $photoData;
-            }
-
-            $albums[] = [
-                'name' => $folderName,
-                'album_key' => $folderName,
-                'display_name' => $metadata['display_name'] ?? ucfirst($folderName),
-                'title' => $metadata['display_name'] ?? ucfirst($folderName),
-                'coverEmoji' => $metadata['emoji'] ?? '📸',
-                'description' => $metadata['description'] ?? '',
-                'date' => $metadata['date_range'] ?? '',
-                'photoCount' => $photoCount,
-                'photo_count' => $photoCount,
-                'photos' => $photos
+        // Initialize album if not exists
+        if (!isset($albumsMap[$albumName])) {
+            $albumsMap[$albumName] = [
+                'name' => $albumName,
+                'album_key' => $albumName,
+                'display_name' => ucfirst(str_replace('_', ' ', $albumName)),
+                'title' => ucfirst(str_replace('_', ' ', $albumName)),
+                'coverEmoji' => '📸',
+                'description' => '',
+                'date' => '',
+                'photoCount' => 0,
+                'photo_count' => 0,
+                'photos' => []
             ];
         }
+
+        $albumsMap[$albumName]['photos'][] = $photo;
+        $albumsMap[$albumName]['photoCount']++;
+        $albumsMap[$albumName]['photo_count']++;
     }
 
-    // Sort by display name
+    $albums = array_values($albumsMap);
+
     usort($albums, function($a, $b) {
         return strcmp($a['display_name'], $b['display_name']);
     });

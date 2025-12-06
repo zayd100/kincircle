@@ -36,6 +36,8 @@
     flex-direction: column;
     position: relative;
     box-shadow: var(--glass-shadow);
+    overflow: hidden; /* Prevent overflow, children handle their own scrolling */
+    min-height: 0; /* Allow flex shrinking */
 }
 
 /* Inbox Header */
@@ -197,7 +199,9 @@
 .conversations-list {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 0 var(--spacing-md);
+    min-height: 0; /* Critical for flex children to scroll */
 }
 
 /* Conversation Item */
@@ -645,52 +649,95 @@
 
 @media (max-width: 768px) {
     .inbox-container {
-        flex-direction: column;
-        height: calc(100vh - 64px);
+        position: relative;
+        height: calc(100vh - 64px - 70px); /* Account for header and bottom nav */
+        overflow: hidden;
     }
-    
+
+    /* Sidebar takes full width on mobile */
     .inbox-sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
-        height: 50%;
+        height: 100%;
         border-right: none;
-        border-bottom: 1px solid var(--glass-border);
+        z-index: 10;
+        transition: transform 0.3s ease;
     }
-    
+
+    /* Chat area takes full width, hidden by default */
     .chat-area {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         margin: 0;
         border-radius: 0;
         border: none;
-        border-top: 1px solid var(--glass-border);
+        z-index: 5;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
     }
-    
+
+    /* When conversation is open, slide chat in and sidebar out */
+    .inbox-container.conversation-open .inbox-sidebar {
+        transform: translateX(-100%);
+    }
+
+    .inbox-container.conversation-open .chat-area {
+        transform: translateX(0);
+    }
+
+    /* Show back button only on mobile */
+    .back-to-list {
+        display: flex !important;
+    }
+
+    .chat-messages {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
     .inbox-header {
         padding: var(--spacing-lg);
     }
-    
+
     .inbox-title {
         font-size: var(--font-size-xl);
     }
-    
+
     .sidebar-search {
         margin: var(--spacing-md);
     }
-    
+
     .filter-tabs {
         margin: 0 var(--spacing-sm);
     }
-    
+
     .conversations-list {
         padding: 0 var(--spacing-sm);
+        flex: 1;
+        overflow-y: auto;
     }
-    
+
     .conversation-item {
         padding: var(--spacing-md);
     }
-    
+
     .compose-modal,
     .quick-contact-modal {
         width: 95%;
         padding: var(--spacing-lg);
+    }
+}
+
+/* Hide back button on desktop */
+@media (min-width: 769px) {
+    .back-to-list {
+        display: none !important;
     }
 }
 

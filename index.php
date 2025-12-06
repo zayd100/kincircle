@@ -9,9 +9,9 @@ $isAdmin = isAdmin();
 try {
     // Recent activity count
     $recentPhotosStmt = $pdo->prepare("
-        SELECT COUNT(*) as count 
-        FROM photo_submissions 
-        WHERE status = 'approved' AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+        SELECT COUNT(*) as count
+        FROM photo_submissions
+        WHERE status = 'approved' AND uploaded_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
     ");
     $recentPhotosStmt->execute();
     $recentPhotosCount = $recentPhotosStmt->fetch(PDO::FETCH_ASSOC)['count'];
@@ -454,7 +454,7 @@ try {
                 <p>Videos, audio, and documents</p>
             </a>
 
-            <a href="calendar-submit.php" class="nav-card events-card">
+            <a href="events.php" class="nav-card events-card">
                 <div class="card-icon">🎉</div>
                 <h3>Events</h3>
                 <p>Submit family events and gatherings</p>

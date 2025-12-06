@@ -1,5 +1,6 @@
-# Sensitive configuration
+# Sensitive configuration - NEVER commit these
 config.php
+r2-config.php
 private/
 
 # User uploads
@@ -17,12 +18,6 @@ node_modules/
 *.log
 debug_*.php
 test_*.php
-capture_api_response.php
-emergency_check_liam.php
-rescue_clarke.php
-nuclear_reset_users.php
-diagnose_user_and_writes.php
-full_site_diagnostic.php
 
 # Database dumps
 *.sql.gz

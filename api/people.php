@@ -37,18 +37,19 @@ try {
                     FROM photo_submissions ps
                     JOIN content_tags ct ON ct.content_id = ps.id AND ct.content_type = 'photo'
                     WHERE ct.person_id = ? AND ps.status = 'approved'
-                    ORDER BY ps.date_taken DESC, ps.created_at DESC
+                    ORDER BY ps.date_taken DESC, ps.uploaded_at DESC
                 ");
                 $stmt->execute([$personId]);
                 $photos = $stmt->fetchAll();
-                
-                // Get media  
+
+                // Get media (videos/documents from photo_submissions with non-image mime types)
                 $stmt = $pdo->prepare("
-                    SELECT ms.*, 'media' as content_type
-                    FROM media_submissions ms
-                    JOIN content_tags ct ON ct.content_id = ms.id AND ct.content_type = 'media'
-                    WHERE ct.person_id = ? AND ms.status = 'approved'
-                    ORDER BY ms.created_at DESC
+                    SELECT ps.*, 'media' as content_type
+                    FROM photo_submissions ps
+                    JOIN content_tags ct ON ct.content_id = ps.id AND ct.content_type = 'media'
+                    WHERE ct.person_id = ? AND ps.status = 'approved'
+                    AND (ps.mime_type NOT LIKE 'image/%' OR ps.file_type NOT LIKE 'image/%')
+                    ORDER BY ps.uploaded_at DESC
                 ");
                 $stmt->execute([$personId]);
                 $media = $stmt->fetchAll();

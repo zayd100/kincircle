@@ -33,19 +33,12 @@ try {
     $pendingMediaStmt->execute();
     $pendingMediaCount = $pendingMediaStmt->fetch(PDO::FETCH_ASSOC)['count'];
     
-    // Reported content count (messages, photos, etc.)
-    $reportedContentStmt = $pdo->prepare("
-        SELECT COUNT(*) as count FROM (
-            SELECT id FROM messages WHERE flagged = 1 AND flagged_reviewed = 0
-            UNION ALL
-            SELECT id FROM photo_submissions WHERE flagged = 1 AND flagged_reviewed = 0
-        ) as reported
-    ");
-    $reportedContentStmt->execute();
-    $reportedContentCount = $reportedContentStmt->fetch(PDO::FETCH_ASSOC)['count'];
-    
-    // Pending events count
-    $pendingEventsStmt = $pdo->prepare("SELECT COUNT(*) as count FROM calendar_events WHERE status = 'pending'");
+    // Reported content count - feature not yet implemented (flagged columns don't exist)
+    // TODO: Add flagged/flagged_reviewed columns to messages and photo_submissions tables when implementing reporting
+    $reportedContentCount = 0;
+
+    // Pending events count (from event_submissions, not calendar_events)
+    $pendingEventsStmt = $pdo->prepare("SELECT COUNT(*) as count FROM event_submissions WHERE status = 'pending'");
     $pendingEventsStmt->execute();
     $pendingEventsCount = $pendingEventsStmt->fetch(PDO::FETCH_ASSOC)['count'];
 
@@ -86,27 +79,27 @@ try {
 
             <!-- Moderation Stats - Things that need attention -->
             <div class="moderation-stats" id="adminStats">
-                <div class="stat-card pending" onclick="adminCore && adminCore.switchModule('photos')" style="cursor: pointer;">
+                <div class="stat-card pending" onclick="switchToPhotosAndRefresh()" style="cursor: pointer;">
                     <div class="stat-number"><?= $pendingPhotosCount ?></div>
                     <div class="stat-label">Pending Photos</div>
                 </div>
-                <div class="stat-card media" onclick="adminCore && adminCore.switchModule('media')" style="cursor: pointer;">
+                <div class="stat-card media" onclick="switchToMediaAndRefresh()" style="cursor: pointer;">
                     <div class="stat-number"><?= $pendingMediaCount ?></div>
                     <div class="stat-label">Pending Media</div>
                 </div>
-                <div class="stat-card memorials">
+                <div class="stat-card memorials" style="cursor: pointer;">
                     <div class="stat-number"><?= $pendingMemorialsCount ?></div>
                     <div class="stat-label">Pending Memorials</div>
                 </div>
-                <div class="stat-card reports" style="cursor: pointer;">
+                <div class="stat-card reports" onclick="adminCore && adminCore.switchModule('messages')" style="cursor: pointer;">
                     <div class="stat-number"><?= $reportedContentCount ?></div>
                     <div class="stat-label">Reported Content</div>
                 </div>
-                <div class="stat-card users" style="cursor: pointer;">
+                <div class="stat-card users" onclick="adminCore && adminCore.switchModule('users')" style="cursor: pointer;">
                     <div class="stat-number"><?= $pendingUsersCount ?></div>
                     <div class="stat-label">New Users</div>
                 </div>
-                <div class="stat-card events" style="cursor: pointer;">
+                <div class="stat-card events" onclick="adminCore && adminCore.switchModule('events')" style="cursor: pointer;">
                     <div class="stat-number"><?= $pendingEventsCount ?></div>
                     <div class="stat-label">Pending Events</div>
                 </div>
@@ -138,5 +131,30 @@ try {
 
     <script src="js/header.js"></script>
     <script src="js/admin-core.js"></script>
+    <script>
+        // Helper functions for stat card clicks - switch module and force refresh
+        async function switchToPhotosAndRefresh() {
+            if (adminCore) {
+                await adminCore.switchModule('photos');
+                // Force refresh after switching
+                if (typeof photosAdmin !== 'undefined') {
+                    photosAdmin.dataLoaded = false;
+                    await photosAdmin.loadDashboardData();
+                    photosAdmin.dataLoaded = true;
+                    photosAdmin.renderPendingPhotos();
+                }
+            }
+        }
+
+        async function switchToMediaAndRefresh() {
+            if (adminCore) {
+                await adminCore.switchModule('media');
+                // Force refresh after switching
+                if (typeof mediaAdmin !== 'undefined' && mediaAdmin.refresh) {
+                    mediaAdmin.refresh();
+                }
+            }
+        }
+    </script>
 </body>
 </html>

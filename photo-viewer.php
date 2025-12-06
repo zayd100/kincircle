@@ -69,6 +69,10 @@ $userId = $_SESSION['user_id'] ?? null;
                             <span class="detail-label">Date:</span>
                             <span id="photoDate" class="detail-value">Loading...</span>
                         </div>
+                        <div class="detail-item" id="photoLocationItem" style="display: none;">
+                            <span class="detail-label">Location:</span>
+                            <span id="photoLocation" class="detail-value"></span>
+                        </div>
                         <div class="detail-item">
                             <span class="detail-label">Photo:</span>
                             <span id="photoPositionDetail" class="detail-value">Loading...</span>
@@ -122,6 +126,6 @@ $userId = $_SESSION['user_id'] ?? null;
     
     <!-- Scripts -->
     <script src="js/header.js"></script>
-    <script src="js/photo-viewer.js"></script>
+    <script src="js/photo-viewer.js?v=<?= time() ?>"></script>
 </body>
 </html>

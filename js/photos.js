@@ -121,7 +121,7 @@ async function loadPhotoAlbums() {
     try {
         const response = await fetch('/api/photo-albums.php');
         const data = await response.json();
-        
+
         // Handle API response format
         if (!data.success || !Array.isArray(data.albums)) {
             console.warn('Invalid albums response format');
@@ -129,25 +129,40 @@ async function loadPhotoAlbums() {
             displayAlbums();
             return;
         }
-        
+
         const albums = data.albums;
         
+        // Helper function to ensure URL is absolute
+        function ensureAbsoluteUrl(url) {
+            if (!url) return '';
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                return url;
+            } else if (url.includes('r2.cloudflarestorage.com')) {
+                return 'https://' + url.replace(/^\/+/, '');
+            }
+            return url;
+        }
+
         // Convert API data to our format with metadata
         photoAlbums = albums.map(album => {
-            // Albums from API don't have photos array yet, so handle gracefully
+            // Albums from API have photos with full R2 URLs
             const albumPhotos = album.photos || [];
-            const coverPhoto = albumPhotos.length > 0 
+            const coverPhotoData = albumPhotos.length > 0
                 ? albumPhotos[Math.floor(Math.random() * albumPhotos.length)]
                 : null;
-            
+
             return {
                 name: album.album_key || album.name,
                 photoCount: parseInt(album.photo_count) || 0,
-                coverPhoto: coverPhoto ? `../${coverPhoto}` : null,
-                photos: albumPhotos.map(photoPath => ({
-                    src: `../${photoPath}`,
-                    title: `Photo from ${album.name}`,
-                    desc: `Family memory from ${album.name}`
+                // Ensure cover photo URL is absolute
+                coverPhoto: coverPhotoData ? ensureAbsoluteUrl(coverPhotoData.src) : null,
+                // Ensure all photo URLs are absolute
+                photos: albumPhotos.map(photo => ({
+                    src: ensureAbsoluteUrl(photo.src),
+                    title: photo.title || `Photo from ${album.name}`,
+                    desc: photo.desc || photo.description || `Family memory from ${album.name}`,
+                    id: photo.id,
+                    filename: photo.filename
                 })),
                 ...albumMetadata[album.name] || {
                     title: album.name,
@@ -309,7 +324,7 @@ function displayAllPhotos() {
     const grid = document.getElementById('photoGrid');
     grid.innerHTML = '';
     grid.className = 'photo-grid all-photos-grid';
-    
+
     photoAlbums.forEach(album => {
         album.photos.forEach((photo, index) => {
             const photoElement = document.createElement('div');
