@@ -60,7 +60,9 @@ try {
     // R2 Storage: Copy from pending to approved path
     $r2 = new R2();
     $storageKey = $submission['storage_key'];
-    $approvedKey = 'approved/albums/' . $safeAlbum . '/' . $filename;
+    // Use the unique filename from the submission record, not the request
+    $uniqueFilename = $submission['filename'];
+    $approvedKey = 'approved/albums/' . $safeAlbum . '/' . $uniqueFilename;
 
     if (!$r2->objectExists($storageKey)) {
         throw new Exception('Photo file not found in R2 storage');
@@ -89,7 +91,7 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Photo approved successfully',
-        'filename' => $filename,
+        'filename' => $uniqueFilename,
         'album' => $album
     ]);
 

@@ -67,11 +67,18 @@ class AdminCore {
                 priority: 6
             },
             {
+                name: 'memorials',
+                title: 'Memorial Moderation',
+                icon: '🕊️',
+                path: 'js/memorials-admin.js',
+                priority: 7
+            },
+            {
                 name: 'users',
                 title: 'User Management',
                 icon: '👥',
                 path: 'js/users-admin.js',
-                priority: 7
+                priority: 8
             }
         ];
         

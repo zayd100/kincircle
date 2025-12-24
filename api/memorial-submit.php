@@ -1,5 +1,12 @@
 <?php
+/**
+ * Memorial Submission API with R2 photo upload support
+ * Handles multiple photos uploaded directly to R2
+ */
+
 require_once '../config.php';
+require_once '../lib/R2.php';
+
 requireLogin();
 
 header('Content-Type: application/json');
@@ -11,80 +18,79 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    // Get form data
-    $name = sanitizeInput($_POST['memorial_name'] ?? '');
-    $birthDate = sanitizeInput($_POST['birth_date'] ?? '');
-    $deathDate = sanitizeInput($_POST['death_date'] ?? '');
-    $memorialText = sanitizeInput($_POST['memorial_text'] ?? '');
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    // Memorial details
+    $name = sanitizeInput($data['name'] ?? '');
+    $birthDate = sanitizeInput($data['birth_date'] ?? '');
+    $deathDate = sanitizeInput($data['death_date'] ?? '');
+    $memorialText = sanitizeInput($data['memorial_text'] ?? '');
+
+    // Photo data (array of photo objects with storage keys)
+    $photos = $data['photos'] ?? [];
 
     // Validate required fields
     if (!$name || !$memorialText) {
-        throw new Exception('Name and memorial message are required');
+        throw new Exception('Name and memorial text are required');
     }
 
-    $photoFilename = null;
+    // Start transaction
+    $pdo->beginTransaction();
 
-    // Handle photo upload if provided
-    if (isset($_FILES['memorial_photo']) && $_FILES['memorial_photo']['error'] === UPLOAD_ERR_OK) {
-        $file = $_FILES['memorial_photo'];
-        $fileSize = $file['size'];
-        $fileType = $file['type'];
-        $tmpName = $file['tmp_name'];
+    try {
+        // Insert memorial submission
+        $stmt = $pdo->prepare("
+            INSERT INTO memorial_submissions (
+                name, birth_date, death_date, memorial_text,
+                submitted_by, status, submitted_at
+            ) VALUES (?, ?, ?, ?, 'pending', NOW())
+        ");
 
-        // Validate file type
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-        if (!in_array($fileType, $allowedTypes)) {
-            throw new Exception('Only JPG, PNG, and GIF images are allowed');
+        $stmt->execute([
+            $name,
+            $birthDate,
+            $deathDate,
+            $memorialText,
+            $_SESSION['user_id']
+        ]);
+
+        $submissionId = $pdo->lastInsertId();
+
+        // Insert photos if any
+        if (!empty($photos)) {
+            $photoStmt = $pdo->prepare("
+                INSERT INTO memorial_submission_photos (
+                    submission_id, storage_key, filename, file_type, file_size,
+                    storage_provider, display_order, uploaded_at
+                ) VALUES (?, ?, ?, ?, ?, 'r2', ?, NOW())
+            ");
+
+            foreach ($photos as $index => $photo) {
+                $photoStmt->execute([
+                    $submissionId,
+                    $photo['key'],
+                    $photo['original_name'],
+                    $photo['file_type'],
+                    $photo['file_size'],
+                    $index
+                ]);
+            }
         }
 
-        // Validate file size (10MB max)
-        if ($fileSize > 10 * 1024 * 1024) {
-            throw new Exception('Photo must be less than 10MB');
-        }
+        $pdo->commit();
 
-        // Generate unique filename
-        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-        $photoFilename = uniqid() . '_' . time() . '.' . $extension;
-        $uploadPath = '../uploads/memorials/' . $photoFilename;
+        echo json_encode([
+            'success' => true,
+            'message' => 'Memorial submitted for review',
+            'submission_id' => $submissionId
+        ]);
 
-        // Ensure memorials directory exists
-        if (!is_dir('../uploads/memorials')) {
-            mkdir('../uploads/memorials', 0755, true);
-        }
-
-        // Move uploaded file
-        if (!move_uploaded_file($tmpName, $uploadPath)) {
-            throw new Exception('Failed to save photo');
-        }
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        throw $e;
     }
-
-    // Insert into memorial_submissions table
-    $stmt = $pdo->prepare("
-        INSERT INTO memorial_submissions (
-            name, birth_date, death_date, memorial_text, photo_filename, submitted_by
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    ");
-
-    $stmt->execute([
-        $name,
-        $birthDate,
-        $deathDate,
-        $memorialText,
-        $photoFilename,
-        $_SESSION['user_id']
-    ]);
-
-    echo json_encode([
-        'success' => true,
-        'message' => 'Memorial submitted successfully!'
-    ]);
 
 } catch (Exception $e) {
-    // Clean up uploaded file if there was an error
-    if (isset($photoFilename) && file_exists('../uploads/memorials/' . $photoFilename)) {
-        unlink('../uploads/memorials/' . $photoFilename);
-    }
-
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

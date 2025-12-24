@@ -87,7 +87,7 @@ try {
                     <div class="stat-number"><?= $pendingMediaCount ?></div>
                     <div class="stat-label">Pending Media</div>
                 </div>
-                <div class="stat-card memorials" style="cursor: pointer;">
+                <div class="stat-card memorials" onclick="adminCore && adminCore.switchModule('memorials')" style="cursor: pointer;">
                     <div class="stat-number"><?= $pendingMemorialsCount ?></div>
                     <div class="stat-label">Pending Memorials</div>
                 </div>
@@ -125,7 +125,8 @@ try {
             pendingPhotos: <?= json_encode($pendingPhotosCount) ?>,
             reportedContent: <?= json_encode($reportedContentCount) ?>,
             newUsers: <?= json_encode($pendingUsersCount) ?>,
-            pendingEvents: <?= json_encode($pendingEventsCount) ?>
+            pendingEvents: <?= json_encode($pendingEventsCount) ?>,
+            pendingMemorials: <?= json_encode($pendingMemorialsCount) ?>
         };
     </script>
 

@@ -12,6 +12,7 @@ $displayName = $_SESSION['display_name'];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Memorial - Reed & Weaver</title>
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="upload/upload.css">
     <style>
         /* Memorial creation form styling */
         .memorial-create-container {
@@ -261,17 +262,20 @@ $displayName = $_SESSION['display_name'];
 
                 <!-- Photo Upload -->
                 <div class="form-section">
-                    <h2>Memorial Photo</h2>
+                    <h2>Memorial Photos</h2>
 
                     <div class="form-group">
-                        <label>Upload Photo (Optional)</label>
-                        <div class="photo-upload-area" id="photoUploadArea">
-                            <div class="upload-icon">📸</div>
-                            <p><strong>Click to select a photo</strong></p>
-                            <p class="help-text">JPG, PNG, or GIF up to 10MB</p>
+                        <label>Upload Photos (Optional)</label>
+                        <p class="help-text" style="margin-bottom: 1rem;">You can upload multiple photos to honor their memory</p>
+                        <div class="drop-zone" id="dropZone">
+                            <div class="drop-content">
+                                <div class="drop-icon">📸</div>
+                                <p class="drop-text">Drag & drop multiple photos here</p>
+                                <p class="drop-subtext">or click to browse and select files</p>
+                                <input type="file" id="memorialPhoto" name="memorial_photos[]" multiple accept="image/*" hidden>
+                            </div>
                         </div>
-                        <input type="file" id="memorialPhoto" name="memorial_photo" accept="image/*">
-                        <img id="photoPreview" class="photo-preview" alt="Preview">
+                        <div class="file-list" id="fileList"></div>
                     </div>
                 </div>
 
@@ -289,78 +293,107 @@ $displayName = $_SESSION['display_name'];
     </main>
 
     <script src="js/header.js"></script>
+    <script src="upload/upload.js"></script>
     <script>
-        // Photo upload handling
-        const photoUploadArea = document.getElementById('photoUploadArea');
-        const photoInput = document.getElementById('memorialPhoto');
-        const photoPreview = document.getElementById('photoPreview');
-
-        photoUploadArea.addEventListener('click', () => {
-            photoInput.click();
-        });
-
-        photoInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                photoUploadArea.classList.add('has-file');
-                photoUploadArea.querySelector('.upload-icon').textContent = '✓';
-                photoUploadArea.querySelector('strong').textContent = file.name;
-
-                // Show preview
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    photoPreview.src = e.target.result;
-                    photoPreview.classList.add('show');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Form submission
-        document.getElementById('memorialForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
+        // Customize photoUploader for memorial context
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Override form submission for memorial
+            const form = document.getElementById('memorialForm');
             const submitBtn = document.getElementById('submitBtn');
             const messageArea = document.getElementById('messageArea');
 
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
 
-            const formData = new FormData(e.target);
+                const name = document.getElementById('memorialName').value.trim();
+                const birthDate = document.getElementById('birthDate').value.trim();
+                const deathDate = document.getElementById('deathDate').value.trim();
+                const memorialText = document.getElementById('memorialText').value.trim();
 
-            try {
-                const response = await fetch('/api/memorial-submit.php', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    messageArea.innerHTML = `
-                        <div class="message success">
-                            ${result.message}<br>
-                            Your memorial will be reviewed by an admin before being published.
-                        </div>
-                    `;
-                    e.target.reset();
-                    photoUploadArea.classList.remove('has-file');
-                    photoUploadArea.querySelector('.upload-icon').textContent = '📸';
-                    photoUploadArea.querySelector('strong').textContent = 'Click to select a photo';
-                    photoPreview.classList.remove('show');
-
-                    setTimeout(() => {
-                        window.location.href = 'memorials.php';
-                    }, 2000);
-                } else {
-                    messageArea.innerHTML = `<div class="message error">${result.error}</div>`;
+                if (!name || !memorialText) {
+                    messageArea.innerHTML = `<div class="message error">Name and memorial message are required</div>`;
+                    return;
                 }
-            } catch (error) {
-                messageArea.innerHTML = `<div class="message error">Error submitting memorial. Please try again.</div>`;
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit for Approval';
-            }
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Uploading photos...';
+
+                try {
+                    // Upload photos to R2
+                    const uploadedPhotos = [];
+
+                    if (photoUploader.selectedFiles.length > 0) {
+                        for (const file of photoUploader.selectedFiles) {
+                            // Get upload URL
+                            const urlResponse = await fetch('/api/get-upload-url.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    filename: file.name,
+                                    fileType: file.type,
+                                    fileSize: file.size,
+                                    uploadType: 'photo'
+                                })
+                            });
+
+                            const urlData = await urlResponse.json();
+                            if (!urlData.success) {
+                                throw new Error(urlData.error || 'Failed to get upload URL');
+                            }
+
+                            // Upload to R2
+                            await photoUploader.uploadToR2(file, urlData.upload, () => {});
+
+                            // Add to uploaded photos array
+                            uploadedPhotos.push({
+                                key: urlData.upload.key,
+                                original_name: file.name,
+                                file_type: file.type,
+                                file_size: file.size
+                            });
+                        }
+                    }
+
+                    submitBtn.textContent = 'Submitting memorial...';
+
+                    // Submit memorial with photo keys
+                    const response = await fetch('/api/memorial-submit.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: name,
+                            birth_date: birthDate,
+                            death_date: deathDate,
+                            memorial_text: memorialText,
+                            photos: uploadedPhotos
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        messageArea.innerHTML = `
+                            <div class="message success">
+                                ${result.message}<br>
+                                Your memorial will be reviewed by an admin before being published.
+                            </div>
+                        `;
+
+                        setTimeout(() => {
+                            window.location.href = 'memorials.php';
+                        }, 2000);
+                    } else {
+                        messageArea.innerHTML = `<div class="message error">${result.error}</div>`;
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit for Approval';
+                    }
+                } catch (error) {
+                    console.error('Error submitting memorial:', error);
+                    messageArea.innerHTML = `<div class="message error">Error submitting memorial. Please try again.</div>`;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit for Approval';
+                }
+            });
         });
     </script>
 </body>

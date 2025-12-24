@@ -1,5 +1,6 @@
 <?php
 require_once "config.php";
+require_once "lib/R2.php";
 requireLogin();
 
 $displayName = $_SESSION['display_name'] ?? 'Family Member';
@@ -16,6 +17,24 @@ try {
     ");
     $stmt->execute();
     $memorials = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Get photos for each memorial
+    $r2 = new R2();
+    foreach ($memorials as &$memorial) {
+        $photosStmt = $pdo->prepare("
+            SELECT * FROM memorial_photos
+            WHERE memorial_id = ?
+            ORDER BY display_order
+        ");
+        $photosStmt->execute([$memorial['id']]);
+        $photos = $photosStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Add download URLs for photos
+        foreach ($photos as &$photo) {
+            $photo['url'] = $r2->getDownloadUrl($photo['storage_key']);
+        }
+        $memorial['photos'] = $photos;
+    }
 } catch (PDOException $e) {
     $memorials = [];
 }
@@ -53,9 +72,12 @@ try {
                 <?php foreach ($memorials as $memorial): ?>
                     <div class="memorial-card" data-memorial="<?= $memorial['id'] ?>">
                         <div class="memorial-photo">
-                            <?php if ($memorial['photo_filename']): ?>
-                                <img src="uploads/memorials/<?= htmlspecialchars($memorial['photo_filename']) ?>"
+                            <?php if (!empty($memorial['photos'])): ?>
+                                <img src="<?= htmlspecialchars($memorial['photos'][0]['url']) ?>"
                                      alt="<?= htmlspecialchars($memorial['name']) ?>">
+                                <?php if (count($memorial['photos']) > 1): ?>
+                                    <div class="photo-count-badge"><?= count($memorial['photos']) ?> photos</div>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <div class="memorial-photo-placeholder">
                                     <span>🕊️</span>
@@ -91,6 +113,22 @@ try {
         </div>
     </div>
 
+    <script>
+        // Pass memorial data to JavaScript
+        const memorialData = <?= json_encode(array_reduce($memorials, function($carry, $memorial) {
+            $carry[$memorial['id']] = [
+                'name' => $memorial['name'],
+                'dates' => ($memorial['birth_date'] && $memorial['death_date'])
+                    ? $memorial['birth_date'] . ' - ' . $memorial['death_date']
+                    : ($memorial['birth_date'] ? 'Born ' . $memorial['birth_date'] : ($memorial['death_date'] ? 'Passed ' . $memorial['death_date'] : '')),
+                'photo' => !empty($memorial['photos']) ? $memorial['photos'][0]['url'] : '',
+                'eulogy' => $memorial['memorial_text'],
+                'stories' => [],
+                'photos' => array_map(function($p) { return $p['url']; }, $memorial['photos'] ?? [])
+            ];
+            return $carry;
+        }, [])) ?>;
+    </script>
     <script src="js/memorials.js"></script>
 </body>
 </html>

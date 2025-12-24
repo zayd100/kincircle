@@ -1,74 +1,8 @@
 /**
  * Memorial Page JavaScript
  * Handles slide-out functionality for memorial details
+ * Memorial data is injected from PHP
  */
-
-// Memorial data - placeholder structure
-const memorialData = {
-    '1': {
-        name: 'Family Member 1',
-        dates: 'Date Range',
-        photo: '../images/gallery/family_01.jpg',
-        eulogy: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.\n\nExcepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.',
-        stories: [
-            {
-                title: 'Family Story 1',
-                content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris consectetur, nunc vel tincidunt facilisis, ipsum nulla vehicula nunc, vel facilisis nunc nulla vel nunc.'
-            },
-            {
-                title: 'Family Story 2', 
-                content: 'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.'
-            }
-        ],
-        photos: [
-            '../images/gallery/family_04.jpg',
-            '../images/gallery/family_05.jpg',
-            '../images/gallery/family_06.jpg'
-        ]
-    },
-    '2': {
-        name: 'Family Member 2',
-        dates: 'Date Range',
-        photo: '../images/gallery/family_02.jpg',
-        eulogy: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
-        stories: [
-            {
-                title: 'Family Story 1',
-                content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris consectetur, nunc vel tincidunt facilisis, ipsum nulla vehicula nunc.'
-            }
-        ],
-        photos: [
-            '../images/gallery/family_07.jpg',
-            '../images/gallery/family_08.jpg'
-        ]
-    },
-    '3': {
-        name: 'Family Member 3',
-        dates: 'Date Range',
-        photo: '../images/gallery/family_03.jpg',
-        eulogy: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
-        stories: [
-            {
-                title: 'Family Story 1',
-                content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris consectetur, nunc vel tincidunt facilisis.'
-            },
-            {
-                title: 'Family Story 2',
-                content: 'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.'
-            },
-            {
-                title: 'Family Story 3',
-                content: 'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.'
-            }
-        ],
-        photos: [
-            '../images/gallery/family_09.jpg',
-            '../images/gallery/family_10.jpg',
-            '../images/gallery/family_11.jpg',
-            '../images/gallery/family_12.jpg'
-        ]
-    }
-};
 
 document.addEventListener('DOMContentLoaded', function() {
     const memorialCards = document.querySelectorAll('.memorial-card');
