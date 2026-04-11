@@ -110,7 +110,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let mouseY = 0;
     let targetX = 0;
     let targetY = 0;
-    
     document.addEventListener('mousemove', (e) => {
         mouseX = (e.clientX - window.innerWidth / 2) / window.innerWidth;
         mouseY = (e.clientY - window.innerHeight / 2) / window.innerHeight;

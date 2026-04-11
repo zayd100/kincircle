@@ -188,7 +188,11 @@ For a family site with 100GB storage: ~$1.50-2/month
 
 Kin Circle is built on the principle that family connections should be private, ad-free, and algorithm-free. No data harvesting, no external tracking, no strangers. Just family.
 
+## To add
+Add, more chat features and fix the dark web UI issue. Also start testing.
 ---
 
 **License**: MIT
 **Created**: 2025
+**Last Update**: 2026
+
