@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Family Login - Reed & Weaver</title>
+    <title>Family Login - Familiagram</title>
     <link rel="stylesheet" href="css/main.css">
     <style>
         /* Login-specific glass morphism styling */
@@ -307,7 +307,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             
             <div class="three-field-explanation">
-                <h3>🔐 Revolutionary Security</h3>
+                <h3>Simple login!</h3>
                 <p>Login with just three memorable things: your name, favorite beverage, and a number. No username needed - impossible to forget!</p>
             </div>
             
@@ -340,7 +340,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 
                 <button type="submit" class="btn-login">
-                    Sign In to Family Hub
+                    Sign In to Famaliagram
                 </button>
             </form>
             

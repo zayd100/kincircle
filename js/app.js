@@ -231,7 +231,7 @@ document.getElementById('contact-search').addEventListener('input', function(e) 
 
 // Data submission functions
 function submitRecipe(data) {
-    // In a real app, this would save to a backend
+    // In a real app, this would save to a backend, this transaction is to be made now.
     console.log('Saving recipe:', data);
     showMessage('Recipe added successfully!', 'success');
     closeModal();
@@ -271,7 +271,7 @@ function showMessage(text, type = 'success') {
 }
 
 function getRecipeData(recipeId) {
-    // Mock data - replace with actual data loading
+    // Mock data - replace with actual data loading //SQL.
     const recipes = {
         'chili': {
             name: 'Grandma\'s Chili',
