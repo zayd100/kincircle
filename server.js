@@ -648,6 +648,6 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Reed & Weaver family site running at http://localhost:${port}`);
+    console.log(`Familiagram site running at http://localhost:${port}`);
     console.log('Press Ctrl+C to stop');
 });
