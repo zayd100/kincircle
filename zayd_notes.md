@@ -1,11 +1,19 @@
-THE NODE SERVER CURRENTLY IS ONLY FOR REAL TIME FEATURES. 
-GET LARAGON.
-Apache will server the php files to the browser.
-PHP will execute the app logic
-HEIDISQL in laragon will be GUI to manage the database
+# Project Setup Overview
 
-A docker-compose.yml for this app would look roughly like:
-yamlservices:
+## Node.js
+- The Node server is currently **only for real-time features**.
+
+## Local Development
+- **Laragon**: Use Laragon as your local environment.
+- **Apache**: Will serve the PHP files to the browser.
+- **PHP**: Executes the core application logic.
+- **HeidiSQL**: GUI tool (bundled with Laragon) to manage the database.
+
+## Docker Setup
+A `docker-compose.yml` for this app would look roughly like:
+
+```yaml
+services:
   php:
     image: php:8.2-apache
     ports:
