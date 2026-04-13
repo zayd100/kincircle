@@ -70,6 +70,7 @@ Inserted that hash and login worked.
 - Database is set up with all tables
 - One admin user exists: all three fields are `password`
 - Can log in and browse the app
+- THE URL ISSUE WAS NOT USING KINCIRCLE FOLDER inside www in the laragon folder instead of the actual contents of the folder with the index.php file being in the folder.
 
 ---
 
