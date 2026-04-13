@@ -90,3 +90,5 @@ If Laragon isn't installed on the machine, reinstall it from laragon.org, move t
 ## Files Added
 - `config.php` — database connection, session start, helper functions
 - `setup_database.sql` — collation fix applied (utf8mb4_unicode_ci)
+
+new styling for admins
