@@ -74,8 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         } catch (PDOException $e) {
-            $message = 'Error submitting registration. Please try again.';
-        }
+    $message = 'Error: ' . $e->getMessage();
+}
     }
 }
 ?>
@@ -491,11 +491,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="form-group">
                         <label for="family_connection">How are you connected to the family?</label>
                         <select id="family_connection" name="family_connection" class="form-select" required>
-                            <option value="">Select your connection...</option>
-                            <option value="reed" <?= ($_POST['family_connection'] ?? '') === 'reed' ? 'selected' : '' ?>>Reed family member</option>
-                            <option value="weaver" <?= ($_POST['family_connection'] ?? '') === 'weaver' ? 'selected' : '' ?>>Weaver family member</option>
-                            <option value="married-in" <?= ($_POST['family_connection'] ?? '') === 'married-in' ? 'selected' : '' ?>>Married into the family</option>
-                            <option value="other" <?= ($_POST['family_connection'] ?? '') === 'other' ? 'selected' : '' ?>>Other family connection</option>
+                <option value="">Select your connection...</option>
+<option value="direct" <?= ($_POST['family_connection'] ?? '') === 'direct' ? 'selected' : '' ?>>Direct family member</option>
+<option value="married-in" <?= ($_POST['family_connection'] ?? '') === 'married-in' ? 'selected' : '' ?>>Married into the family</option>
+<option value="other" <?= ($_POST['family_connection'] ?? '') === 'other' ? 'selected' : '' ?>>Other family connection</option>
                         </select>
                     </div>
                     
