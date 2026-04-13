@@ -190,25 +190,50 @@ class FamilyMessageBoard {
         }
     }
     
-    processThreadsData(rawThreads) {
-        // Convert PHP thread data to expected format
-        return rawThreads.map(thread => ({
-            id: thread.id,
-            title: thread.title,
-            content: thread.content,
-            author: {
-                name: thread.author_name || 'Unknown',
-                initials: this.getInitials(thread.author_name)
-            },
-            category: thread.category || 'general',
-            createdAt: thread.created_at,
-            lastActivity: thread.last_reply_time || thread.created_at,
-            replyCount: parseInt(thread.reply_count) || 0,
-            viewCount: parseInt(thread.view_count) || 0,
-            isPinned: thread.is_pinned === 1,
-            isLocked: thread.is_locked === 1
-        }));
+  processThreadsData(rawThreads) {
+    return rawThreads.map(thread => ({
+        id: thread.id,
+        title: thread.title,
+        content: thread.content,
+        author: {
+            name: thread.author_name || 'Unknown',
+            initials: this.getInitials(thread.author_name)
+        },
+        category: thread.category || 'general',
+        createdAt: thread.created_at,
+        lastActivity: thread.last_reply_time || thread.created_at,
+        replyCount: parseInt(thread.reply_count) || 0,
+        viewCount: parseInt(thread.view_count) || 0,
+        isPinned: thread.is_pinned === 1,
+        isLocked: thread.is_locked === 1,
+        replies: this.parseReplies(thread.replies) // ADD THIS
+    }));
+}
+
+parseReplies(repliesJson) {
+    try {
+        const raw = typeof repliesJson === 'string' 
+            ? JSON.parse(repliesJson) 
+            : (repliesJson || []);
+        
+        // JSON_ARRAYAGG with no rows returns [null], filter that out
+        return raw
+            .filter(r => r && r.id)
+            .map(r => ({
+                id: r.id,
+                content: r.content,
+                createdAt: r.created_at,
+                isEdited: false,
+                author: {
+                    name: r.author || 'Unknown',
+                    initials: this.getInitials(r.author)
+                }
+            }));
+    } catch (e) {
+        console.error('Failed to parse replies:', e);
+        return [];
     }
+}
     
     getInitials(name) {
         if (!name) return '?';
@@ -545,8 +570,8 @@ class FamilyMessageBoard {
         thread.viewCount++;
         
         // Load replies from API
-        setTimeout(async () => {
-            const replies = await this.loadThreadReplies(thread.id);
+       setTimeout(async () => {
+    const replies = await this.loadThreadReplies(thread.id);
             
             content.innerHTML = `
             <div class="thread-detail-header">
@@ -618,22 +643,10 @@ class FamilyMessageBoard {
         }, 100); // Small delay to show loading spinner briefly
     }
     
-    async loadThreadReplies(threadId) {
-        try {
-            const response = await fetch(`/api/messages/${threadId}/replies`);
-            const data = await response.json();
-            
-            if (data.success) {
-                return data.replies || [];
-            } else {
-                console.warn('No replies returned from API');
-                return [];
-            }
-        } catch (error) {
-            console.error('Error loading thread replies:', error);
-            return [];
-        }
-    }
+ async loadThreadReplies(threadId) {
+    const thread = this.threads.find(t => t.id == threadId); // == not ===
+    return thread?.replies || [];
+}
     
     createReplyHTML(reply) {
         return `

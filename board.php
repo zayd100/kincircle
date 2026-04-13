@@ -17,21 +17,42 @@ $activeContributors = 0;
 
 // Fetch board data from database
 try {
-    // Get all threads with reply counts (using messages table)
+    // Get all threads with reply counts (using messages table) also i need comments so Changing the query.
     $stmt = $pdo->prepare("
-        SELECT m.id, m.subject as title, m.content, m.created_at,
-               m.posted_by as user_id, u.display_name as author_name,
-               COUNT(DISTINCT r.id) as reply_count,
-               MAX(r.created_at) as last_reply_time,
-               0 as view_count, 0 as is_pinned, 0 as is_locked,
-               'general' as category
-        FROM messages m
-        LEFT JOIN users u ON m.posted_by = u.id
-        LEFT JOIN message_replies r ON m.id = r.message_id
-        WHERE m.is_active = 1
-        GROUP BY m.id
-        ORDER BY COALESCE(MAX(r.created_at), m.created_at) DESC
-    ");
+    SELECT 
+        m.id, 
+        m.subject as title, 
+        m.content, 
+        m.created_at,
+        m.posted_by as user_id, 
+        u.display_name as author_name,
+
+        COUNT(DISTINCT r.id) as reply_count,
+        MAX(r.created_at) as last_reply_time,
+
+        0 as view_count, 
+        0 as is_pinned, 
+        0 as is_locked,
+        'general' as category,
+
+        JSON_ARRAYAGG(
+            JSON_OBJECT(
+                'id', r.id,
+                'content', r.content,
+                'created_at', r.created_at,
+                'author', u2.display_name
+            )
+        ) as replies
+
+    FROM messages m
+    LEFT JOIN users u ON m.posted_by = u.id
+    LEFT JOIN message_replies r ON m.id = r.message_id
+    LEFT JOIN users u2 ON r.posted_by = u2.id
+
+    WHERE m.is_active = 1
+    GROUP BY m.id
+    ORDER BY COALESCE(MAX(r.created_at), m.created_at) DESC
+");
     $stmt->execute();
     $threads = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
